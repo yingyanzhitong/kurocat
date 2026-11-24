@@ -7,7 +7,6 @@
   </head>
   <body>
     <canvas id="pet-canvas"></canvas>
-    <canvas id="pet-canvas-3d" class="hidden"></canvas>
 
     <div id="update-toast" class="update-toast hidden" role="status" aria-live="polite">
       <span class="update-toast-text" id="update-toast-text">✨ 发现新版本</span>
@@ -39,81 +38,43 @@
     </div>
 
     <div id="context-menu" class="context-menu hidden">
-      <div class="menu-header" id="menu-header">🐈‍⬛ KuroCat 小黑猫</div>
+      <div class="menu-header" id="menu-header">🐱 KuroCat UU</div>
       <div class="menu-scale-row">
         <span class="menu-scale-label">角色外观（支持 MCP 定制）</span>
         <div class="breed-pills" id="breed-pills">
-          <button class="breed-pill active" data-breed="black">🐈‍⬛ 小黑猫</button>
-          <button class="breed-pill" data-breed="ragdoll">🐱 布偶猫</button>
-          <button class="breed-pill" data-breed="dafeiyu">🐳 大肥鱼</button>
+          <button class="breed-pill" data-breed="photo-uu">🐱 UU</button>
         </div>
       </div>
-      <div class="menu-scale-row" id="render-mode-row">
-        <span class="menu-scale-label">视觉模式（可选 3D / 2D）</span>
-        <div class="kb-pills">
-          <button class="kb-pill active" data-rendermode="3d" type="button">✨ 3D 立体</button>
-          <button class="kb-pill" data-rendermode="2d" type="button">🎨 2D 经典</button>
-        </div>
-      </div>
-      <div class="menu-scale-row" id="collar-row">
-        <span class="menu-scale-label">3D 项圈铃铛</span>
-        <div class="collar-pills">
-          <button class="kb-pill active" data-collar="none" type="button">无</button>
-          <button class="kb-pill" data-collar="red" type="button">红</button>
-          <button class="kb-pill" data-collar="blue" type="button">蓝</button>
-          <button class="kb-pill" data-collar="pink" type="button">粉</button>
-          <button class="kb-pill" data-collar="green" type="button">绿</button>
+      <button class="menu-item" type="button" data-action="import-cat-skin">
+        <span>导入猫咪皮肤…</span>
+        <span class="menu-hint">.json</span>
+      </button>
+      <input id="cat-skin-file" type="file" accept=".json,application/json" hidden />
+      <div id="cat-skin-result" class="menu-hint" role="status" hidden></div>
+      <div class="menu-scale-row">
+        <span class="menu-scale-label" id="pointer-label">指针设备</span>
+        <div class="kb-pills" role="group" aria-labelledby="pointer-label">
+          <button class="kb-pill active" type="button" data-action="select-mouse" aria-pressed="true">鼠标</button>
+          <button class="kb-pill" type="button" data-action="select-touchpad" aria-pressed="false">触摸板</button>
         </div>
       </div>
       <div class="menu-scale-row" id="headphone-row">
         <span class="menu-scale-label">电竞耳机</span>
-        <div class="render-mode-pills">
+        <div class="headphone-pills">
           <button class="kb-pill active" data-headphonemode="off" type="button">关闭</button>
           <button class="kb-pill" data-headphonemode="auto" type="button">🎮 游戏自动</button>
           <button class="kb-pill" data-headphonemode="on" type="button">🎧 常戴</button>
         </div>
       </div>
       <div class="menu-sep"></div>
-      <button class="menu-item" data-action="toggle-privacy" title="检测到输入密码时猫猫自动闭眼、大肥鱼双手捂眼并隐藏全部按键">
-        <span>输密码自动闭眼防偷窥</span>
-        <span class="menu-check" id="chk-privacy">✓</span>
-      </button>
-      <button class="menu-item" data-action="toggle-bubbles">
-        <span>悬浮按键气泡</span>
-        <span class="menu-check" id="chk-bubbles">✓</span>
-      </button>
-      <button class="menu-item" data-action="toggle-lock" title="开启后按住 Alt 键仍可拖动或右键解锁">
-        <span>锁定鼠标穿透（Alt 解锁）</span>
-        <span class="menu-check" id="chk-lock"></span>
-      </button>
-      <button class="menu-item" data-action="toggle-sound">
-        <span>摸头呼噜声</span>
-        <span class="menu-check" id="chk-sound">✓</span>
-      </button>
-      <button class="menu-item" data-action="toggle-top">
-        <span>始终置顶显示</span>
-        <span class="menu-check" id="chk-top">✓</span>
-      </button>
       <button class="menu-item" data-action="toggle-autostart">
         <span>开机自动启动</span>
         <span class="menu-check" id="chk-autostart"></span>
       </button>
-      <div class="menu-sep"></div>
-      <button class="menu-item" data-action="toggle-mcp">
-        <span>开启 MCP 扩展</span>
-        <span class="menu-check" id="chk-mcp">✓</span>
-      </button>
-      <button class="menu-item" data-action="copy-mcp" id="btn-copy-mcp">
-        <span>复制 MCP 配置</span>
-        <span class="menu-hint" id="mcp-copy-hint">AI 捏猫</span>
-      </button>
+
       <div class="menu-sep"></div>
       <div class="menu-scale-row">
-        <span class="menu-scale-label">键盘配列与方向</span>
-        <div class="kb-pills">
-          <button class="kb-pill active" data-kblayout="65">65% 紧凑</button>
-          <button class="kb-pill" data-kblayout="108">108 全尺寸</button>
-        </div>
+        <span class="menu-scale-label">键盘方向</span>
         <div class="kb-pills">
           <button class="kb-pill active" data-kborient="cat">面向猫咪</button>
           <button class="kb-pill" data-kborient="viewer">面向观众</button>
@@ -138,7 +99,7 @@
       <div class="menu-scale-row">
         <div class="scale-header">
           <span class="menu-scale-label">尺寸缩放</span>
-          <button class="scale-value-btn" id="scale-value" type="button" title="点击复位 100%">100%</button>
+          <button class="scale-value-btn" id="scale-value" type="button" title="点击复位 60%">60%</button>
         </div>
         <div class="scale-slider-wrap">
           <input
@@ -148,7 +109,7 @@
             min="20"
             max="150"
             step="1"
-            value="100"
+            value="60"
           />
           <div class="scale-ticks">
             <span>20%</span>

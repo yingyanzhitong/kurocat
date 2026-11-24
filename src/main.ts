@@ -1,4 +1,5 @@
 import './style.css';
+import { bindSkinImport } from './skinImport';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -17,9 +18,7 @@ import {
   type KeyboardLayoutId,
   type KeySpec,
 } from './keyboardLayout';
-import type { CollarColorId, KuroCatEngine3D } from './catEngine3d';
 
-type DesktopRenderMode = '2d' | '3d';
 type HeadphoneMode = 'auto' | 'on' | 'off';
 
 interface AppSettings {
@@ -36,14 +35,13 @@ interface AppSettings {
   mcpPort: number;
   keyboardLayout: KeyboardLayoutId;
   keyboardOrientation: KeyboardOrientation;
+  useTouchpad?: boolean;
   privacyPasswordGuard: boolean;
   tailKeyMode: TailKeyMode;
   tailKeyIds: string[];
   obsEnabled?: boolean;
   obsPort?: number;
   obsHidePet?: boolean;
-  renderMode?: DesktopRenderMode;
-  collarColor?: CollarColorId;
   headphoneMode?: HeadphoneMode;
 }
 
@@ -109,13 +107,13 @@ const TAIL_MODE_LABELS: Record<TailKeyMode, string> = {
 let settings: AppSettings = {
   x: null,
   y: null,
-  scale: 1,
+  scale: 0.6,
   alwaysOnTop: true,
   clickThroughLocked: false,
   showKeyBubbles: true,
   soundEnabled: true,
   autostart: false,
-  catBreed: 'black',
+  catBreed: 'photo-uu',
   mcpEnabled: true,
   mcpPort: 27420,
   keyboardLayout: '65',
@@ -123,15 +121,12 @@ let settings: AppSettings = {
   privacyPasswordGuard: true,
   tailKeyMode: 'smart',
   tailKeyIds: [...DEFAULT_TAIL_KEY_IDS],
-  renderMode: '3d',
-  collarColor: 'none',
   headphoneMode: 'off',
 };
 
 let catList: CatSkinConfig[] = [...DEFAULT_BUILTIN_CATS];
 
 const canvas = document.getElementById('pet-canvas') as HTMLCanvasElement;
-const canvas3d = document.getElementById('pet-canvas-3d') as HTMLCanvasElement;
 const menuEl = document.getElementById('context-menu') as HTMLDivElement;
 const breedPillsEl = document.getElementById('breed-pills') as HTMLDivElement;
 const scaleSliderEl = document.getElementById('scale-slider') as HTMLInputElement;
@@ -150,17 +145,10 @@ const tailModeBadgeEl = document.getElementById('tail-mode-badge') as HTMLSpanEl
 const tailKeysCountEl = document.getElementById('tail-keys-count') as HTMLSpanElement;
 const engine = new KuroCatEngine(canvas);
 
-// Lazy-loaded Three.js 3D engine (NEVER imported when user stays in 2D mode -> +0 MB overhead!)
-let engine3d: KuroCatEngine3D | null = null;
-let loading3dPromise: Promise<void> | null = null;
-let webgl3dUnavailable = false;
-let isWin7Ulw = false;
-let active3d = false;
 let privacyActive = false;
 let gameActive = false;
 
 function shouldWearHeadphonesNow(): boolean {
-  if (settings.catBreed === 'dafeiyu') return false;
   const hm: HeadphoneMode =
     settings.headphoneMode === 'auto' || settings.headphoneMode === 'on'
       ? settings.headphoneMode
@@ -170,96 +158,6 @@ function shouldWearHeadphonesNow(): boolean {
   return gameActive;
 }
 
-function wants3DNow(): boolean {
-  return (
-    settings.renderMode !== '2d' &&
-    settings.catBreed !== 'dafeiyu' &&
-    !tailPickerOpen &&
-    !isWin7Ulw &&
-    !webgl3dUnavailable
-  );
-}
-
-function syncEngine3DState(): void {
-  if (!engine3d) return;
-  const activeCat = catList.find((c) => c.id === settings.catBreed) ?? catList[0];
-  const kbLayout: KeyboardLayoutId = settings.keyboardLayout === '108' ? '108' : '65';
-  const kbOrient: KeyboardOrientation = settings.keyboardOrientation === 'viewer' ? 'viewer' : 'cat';
-  const tailMode: TailKeyMode =
-    settings.tailKeyMode === 'custom' ||
-    settings.tailKeyMode === 'edge' ||
-    settings.tailKeyMode === 'off'
-      ? settings.tailKeyMode
-      : 'smart';
-  const tailIds = Array.isArray(settings.tailKeyIds) ? settings.tailKeyIds : [...DEFAULT_TAIL_KEY_IDS];
-  const collar: CollarColorId =
-    settings.collarColor === 'red' ||
-    settings.collarColor === 'blue' ||
-    settings.collarColor === 'pink' ||
-    settings.collarColor === 'green'
-      ? settings.collarColor
-      : 'none';
-
-  engine3d.showKeyBubbles = settings.showKeyBubbles;
-  engine3d.setRenderStyle('3d');
-  if (activeCat) {
-    engine3d.setCatSkin(activeCat);
-  }
-  engine3d.setCollar(collar);
-  engine3d.setHeadphones(shouldWearHeadphonesNow());
-  engine3d.setKeyboardConfig(kbLayout, kbOrient);
-  engine3d.setTailKeyConfig(tailMode, tailIds);
-  engine3d.setPrivacyMode(privacyActive);
-  engine3d.resize();
-}
-
-function activateRenderEngine(): void {
-  const want3d = wants3DNow();
-  if (!want3d) {
-    if (active3d) {
-      engine3d?.stop();
-      canvas3d.classList.add('hidden');
-      canvas.classList.remove('hidden');
-      engine.resize();
-      engine.start();
-      active3d = false;
-    }
-    return;
-  }
-
-  if (engine3d) {
-    syncEngine3DState();
-    if (!active3d) {
-      engine.stop();
-      canvas.classList.add('hidden');
-      canvas3d.classList.remove('hidden');
-      engine3d.resize();
-      engine3d.start();
-      active3d = true;
-    }
-    return;
-  }
-
-  if (!loading3dPromise) {
-    loading3dPromise = import('./catEngine3d')
-      .then(({ KuroCatEngine3D }) => {
-        engine3d = new KuroCatEngine3D(canvas3d, { embedded: false });
-        window.addEventListener('resize', () => engine3d?.resize());
-        activateRenderEngine();
-      })
-      .catch((err) => {
-        console.warn('3D WebGL unavailable, keeping 2D mode:', err);
-        webgl3dUnavailable = true;
-        active3d = false;
-        canvas3d.classList.add('hidden');
-        canvas.classList.remove('hidden');
-        engine.start();
-      })
-      .finally(() => {
-        loading3dPromise = null;
-      });
-  }
-}
 
 function renderBreedPills(): void {
   if (!breedPillsEl) return;
@@ -296,6 +194,12 @@ function syncMenuUI(): void {
   };
   setCheck('chk-privacy', settings.privacyPasswordGuard !== false);
   setCheck('chk-bubbles', settings.showKeyBubbles);
+  const pointerAction = settings.useTouchpad === true ? 'select-touchpad' : 'select-mouse';
+  document.querySelectorAll<HTMLButtonElement>('[data-action="select-mouse"], [data-action="select-touchpad"]').forEach((btn) => {
+    const selected = btn.dataset.action === pointerAction;
+    btn.classList.toggle('active', selected);
+    btn.setAttribute('aria-pressed', String(selected));
+  });
   setCheck('chk-lock', settings.clickThroughLocked);
   setCheck('chk-sound', settings.soundEnabled);
   setCheck('chk-top', settings.alwaysOnTop);
@@ -306,7 +210,6 @@ function syncMenuUI(): void {
     updateScaleSliderVisual(settings.scale);
   }
 
-  const kbLayout: KeyboardLayoutId = settings.keyboardLayout === '108' ? '108' : '65';
   const kbOrient: KeyboardOrientation = settings.keyboardOrientation === 'viewer' ? 'viewer' : 'cat';
   const tailMode: TailKeyMode =
     settings.tailKeyMode === 'custom' ||
@@ -316,9 +219,6 @@ function syncMenuUI(): void {
       : 'smart';
   const tailIds = Array.isArray(settings.tailKeyIds) ? settings.tailKeyIds : [...DEFAULT_TAIL_KEY_IDS];
 
-  document.querySelectorAll<HTMLButtonElement>('[data-kblayout]').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.kblayout === kbLayout);
-  });
   document.querySelectorAll<HTMLButtonElement>('[data-kborient]').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.kborient === kbOrient);
   });
@@ -334,24 +234,6 @@ function syncMenuUI(): void {
   const activeCat = catList.find((c) => c.id === settings.catBreed) ?? catList[0];
   renderBreedPills();
 
-  const renderMode: DesktopRenderMode = settings.renderMode === '2d' ? '2d' : '3d';
-  const collarColor: CollarColorId =
-    settings.collarColor === 'red' ||
-    settings.collarColor === 'blue' ||
-    settings.collarColor === 'pink' ||
-    settings.collarColor === 'green'
-      ? settings.collarColor
-      : 'none';
-  document.querySelectorAll<HTMLButtonElement>('[data-rendermode]').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.rendermode === renderMode);
-  });
-  document.querySelectorAll<HTMLButtonElement>('[data-collar]').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.collar === collarColor);
-  });
-  const collarRowEl = document.getElementById('collar-row');
-  if (collarRowEl) {
-    collarRowEl.classList.toggle('hidden', renderMode === '2d' || settings.catBreed === 'dafeiyu');
-  }
 
   const headphoneMode: HeadphoneMode =
     settings.headphoneMode === 'auto' || settings.headphoneMode === 'on'
@@ -360,10 +242,6 @@ function syncMenuUI(): void {
   document.querySelectorAll<HTMLButtonElement>('[data-headphonemode]').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.headphonemode === headphoneMode);
   });
-  const headphoneRowEl = document.getElementById('headphone-row');
-  if (headphoneRowEl) {
-    headphoneRowEl.classList.toggle('hidden', settings.catBreed === 'dafeiyu');
-  }
 
   const headerEl = document.getElementById('menu-header');
   if (headerEl && activeCat) {
@@ -373,15 +251,15 @@ function syncMenuUI(): void {
   }
 
   engine.showKeyBubbles = settings.showKeyBubbles;
+  engine.useTouchpad = settings.useTouchpad === true;
   engine.setCatAppearance(activeCat?.id || 'black', activeCat);
   engine.setHeadphones(shouldWearHeadphonesNow());
-  engine.setKeyboardConfig(kbLayout, kbOrient);
+  engine.setKeyboardConfig('65', kbOrient);
   engine.setTailKeyConfig(tailMode, tailIds);
   if (!sliderDragging) {
     engine.setRenderScale(settings.scale);
   }
   catAudio.setEnabled(settings.soundEnabled);
-  activateRenderEngine();
   if (tailPickerOpen) syncTailPickerSelection();
 }
 
@@ -482,7 +360,6 @@ function closeTailPicker(): void {
   canvas.classList.remove('tail-key-hover');
   engine.setTailPickerActive(false);
   syncTailPickerBounds();
-  activateRenderEngine();
   syncWin7OverlayFn?.(false);
 }
 
@@ -679,8 +556,13 @@ function handleUpdateProgressEvent(ev: UpdateProgressEvent, fromManual = false):
       break;
     case 'up_to_date':
       updateBusy = false;
-      setUpdateHint(`✓ v${appVersion}`);
-      showUpdateToast(`✓ 已是最新版本 v${appVersion}`, { autoHideMs: 2600 });
+      if (ev.info?.latestVersion === '') {
+        setUpdateHint('暂无发行版');
+        showUpdateToast('仓库尚未发布安装包', { showOpen: true, autoHideMs: 5200 });
+      } else {
+        setUpdateHint(`✓ v${appVersion}`);
+        showUpdateToast(`✓ 已是最新版本 v${appVersion}`, { autoHideMs: 2600 });
+      }
       break;
     case 'downloading':
     case 'verifying':
@@ -785,7 +667,7 @@ async function bootstrap(): Promise<void> {
 
   btnToastOpenEl.addEventListener('click', (e) => {
     e.stopPropagation();
-    const url = latestUpdateInfo?.releaseUrl || 'https://github.com/qianyiai/kurocat/releases/latest';
+    const url = latestUpdateInfo?.releaseUrl || null;
     void invoke('open_release_page', { url });
   });
 
@@ -823,7 +705,7 @@ async function bootstrap(): Promise<void> {
       e.stopPropagation();
       sliderDragging = false;
       updateScaleSliderVisual(1.0);
-      void applySettingsPatch({ scale: 1.0 });
+      void applySettingsPatch({ scale: 0.6 });
     });
   }
 
@@ -898,34 +780,25 @@ async function bootstrap(): Promise<void> {
           }
           break;
         }
-        if (active3d && engine3d) engine3d.onKeyDown(p.vk, p.repeat);
-        else engine.onKeyDown(p.vk, p.repeat);
+        engine.onKeyDown(p.vk, p.repeat);
         break;
       case 'keyUp':
-        if (active3d || tailPickerOpen) engine3d?.onKeyUp(p.vk);
-        if (!active3d) {
-          engine.onKeyUp(p.vk);
-        }
+        engine.onKeyUp(p.vk);
         break;
       case 'mouseMove':
-        if (active3d && engine3d) engine3d.onGlobalMouseMove(p.nx, p.ny);
-        else engine.onGlobalMouseMove(p.nx, p.ny);
+        engine.onGlobalMouseMove(p.nx, p.ny, p.x, p.y);
         break;
       case 'mouseDown':
-        if (active3d && engine3d) engine3d.onMouseDown(p.button);
-        else engine.onMouseDown(p.button);
+        engine.onMouseDown(p.button);
         break;
       case 'mouseUp':
-        if (active3d && engine3d) engine3d.onMouseUp(p.button);
-        else engine.onMouseUp(p.button);
+        engine.onMouseUp(p.button);
         break;
       case 'mouseWheel':
-        if (active3d && engine3d) engine3d.onMouseWheel();
-        else engine.onMouseWheel();
+        engine.onMouseWheel();
         break;
       case 'privacyTyping':
-        if (active3d && engine3d) engine3d.onPrivacyTyping();
-        else engine.onPrivacyTyping();
+        engine.onPrivacyTyping();
         break;
     }
   });
@@ -933,14 +806,12 @@ async function bootstrap(): Promise<void> {
   await listen<boolean>('kuro-privacy', (ev) => {
     privacyActive = Boolean(ev.payload);
     engine.setPrivacyMode(privacyActive);
-    engine3d?.setPrivacyMode(privacyActive);
   });
 
   try {
     gameActive = await invoke<boolean>('get_game_active');
     const wearNow = shouldWearHeadphonesNow();
     engine.setHeadphones(wearNow);
-    engine3d?.setHeadphones(wearNow);
   } catch {
     // non-Tauri or older backend
   }
@@ -949,17 +820,14 @@ async function bootstrap(): Promise<void> {
     gameActive = Boolean(ev.payload?.active);
     const wearNow = shouldWearHeadphonesNow();
     engine.setHeadphones(wearNow);
-    engine3d?.setHeadphones(wearNow);
   });
 
   await listen<WindowCursorInfo>('kuro-cursor', (ev) => {
     const c = ev.payload;
     altOverride = Boolean(c.altOverride);
-    if (active3d && engine3d) engine3d.onWindowCursor(c.relX, c.relY, c.overCat);
-    else engine.onWindowCursor(c.relX, c.relY, c.overCat);
+    engine.onWindowCursor(c.relX, c.relY, c.overCat);
     const interactive = !settings.clickThroughLocked || altOverride;
     canvas.classList.toggle('pet-hover', c.overCat && interactive);
-    canvas3d.classList.toggle('pet-hover', c.overCat && interactive);
   });
 
   canvas.addEventListener('mousemove', (e) => {
@@ -990,7 +858,6 @@ async function bootstrap(): Promise<void> {
       }
       if (settings.clickThroughLocked && !altOverride && !e.altKey) return;
       canvas.classList.add('pet-dragging');
-      canvas3d.classList.add('pet-dragging');
       void invoke('set_dragging', { dragging: true });
       try {
         const nativeHandled = await invoke<boolean>('start_pet_drag').catch(() => false);
@@ -999,16 +866,13 @@ async function bootstrap(): Promise<void> {
         }
       } finally {
         canvas.classList.remove('pet-dragging');
-        canvas3d.classList.remove('pet-dragging');
         engine.onMouseUp('left');
-        engine3d?.onMouseUp('left');
         void invoke('set_dragging', { dragging: false });
         void invoke('save_window_pos');
       }
     }
   };
   canvas.addEventListener('mousedown', handleCanvasMouseDown);
-  canvas3d.addEventListener('mousedown', handleCanvasMouseDown);
 
   // Right-click opens sleek dark glass settings menu (both 2D & 3D canvases!)
   const handleCanvasContextMenu = (e: MouseEvent) => {
@@ -1021,7 +885,6 @@ async function bootstrap(): Promise<void> {
     openContextMenu(e.clientX, e.clientY);
   };
   canvas.addEventListener('contextmenu', handleCanvasContextMenu);
-  canvas3d.addEventListener('contextmenu', handleCanvasContextMenu);
 
   // Side menu window auto-closes on its own focus loss; do NOT close on main blur (clicking the menu blurs main!)
   window.addEventListener('keydown', (e) => {
@@ -1033,9 +896,10 @@ async function bootstrap(): Promise<void> {
     }
   });
 
+  const openSkinFile = bindSkinImport();
   menuEl.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest<HTMLElement>(
-      '[data-action], [data-scale], [data-breed], [data-rendermode], [data-collar], [data-headphonemode], [data-kblayout], [data-kborient], [data-tailmode]',
+      '[data-action], [data-scale], [data-breed], [data-headphonemode], [data-kborient], [data-tailmode]',
     );
     if (!target) return;
 
@@ -1045,30 +909,6 @@ async function bootstrap(): Promise<void> {
       return;
     }
 
-    const renderModeAttr = target.dataset.rendermode;
-    if (renderModeAttr === '2d' || renderModeAttr === '3d') {
-      void applySettingsPatch({ renderMode: renderModeAttr });
-      return;
-    }
-
-    const collarAttr = target.dataset.collar;
-    if (
-      collarAttr === 'none' ||
-      collarAttr === 'red' ||
-      collarAttr === 'blue' ||
-      collarAttr === 'pink' ||
-      collarAttr === 'green'
-    ) {
-      void applySettingsPatch({ collarColor: collarAttr });
-      return;
-    }
-
-    const kbLayoutAttr = target.dataset.kblayout;
-    if (kbLayoutAttr === '65' || kbLayoutAttr === '108') {
-      void applySettingsPatch({ keyboardLayout: kbLayoutAttr });
-      closeContextMenu();
-      return;
-    }
 
     const kbOrientAttr = target.dataset.kborient;
     if (kbOrientAttr === 'cat' || kbOrientAttr === 'viewer') {
@@ -1103,6 +943,13 @@ async function bootstrap(): Promise<void> {
     }
 
     switch (target.dataset.action) {
+      case 'import-cat-skin':
+        openSkinFile();
+        break;
+      case 'select-mouse':
+      case 'select-touchpad':
+        void applySettingsPatch({ useTouchpad: target.dataset.action === 'select-touchpad' });
+        break;
       case 'toggle-privacy':
         void applySettingsPatch({ privacyPasswordGuard: !(settings.privacyPasswordGuard !== false) });
         break;
@@ -1154,8 +1001,6 @@ async function bootstrap(): Promise<void> {
   try {
     const useWin7Ulw = await invoke<boolean>('is_win7_ulw_mode');
     if (useWin7Ulw) {
-      isWin7Ulw = true;
-      activateRenderEngine();
       document.documentElement.classList.add('win7-ulw-mode');
       const petCtx = canvas.getContext('2d');
       let win7Visible = true;

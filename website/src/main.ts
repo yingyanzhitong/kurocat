@@ -16,7 +16,6 @@ import {
   type Locale,
 } from './i18n';
 import { keyboardEventToVk } from './webKeyMap';
-import type { CollarColorId, KuroCatEngine3D } from '../../src/catEngine3d';
 
 const LOCAL_MIRROR_VERSION = 'v5.0.1';
 const LOCAL_MIRROR_VER_NUM = '5.0.1';
@@ -190,8 +189,8 @@ async function syncGithubMetadata(): Promise<void> {
   const timer = window.setTimeout(() => controller.abort(), 4500);
   try {
     const [repoRes, relRes] = await Promise.all([
-      fetch('https://api.github.com/repos/qianyiai/kurocat', { signal: controller.signal }),
-      fetch('https://api.github.com/repos/qianyiai/kurocat/releases/latest', { signal: controller.signal }),
+      fetch('https://api.github.com/repos/yingyanzhitong/kurocat', { signal: controller.signal }),
+      fetch('https://api.github.com/repos/yingyanzhitong/kurocat/releases/latest', { signal: controller.signal }),
     ]);
 
     if (repoRes.ok) {
@@ -239,26 +238,15 @@ async function syncGithubMetadata(): Promise<void> {
 
 function initPlayground(): void {
   const canvas = document.getElementById('kurocat-canvas') as HTMLCanvasElement | null;
-  const canvas3d = document.getElementById('kurocat-canvas-3d') as HTMLCanvasElement | null;
   const viewport = document.getElementById('canvas-viewport') as HTMLDivElement | null;
   if (!canvas || !viewport) return;
 
   const engine = new KuroCatEngine(canvas, { embedded: true });
-  let engine3d: KuroCatEngine3D | null = null;
-  let loading3d: Promise<void> | null = null;
-  let webgl3dBlocked = false;
-  let active3d = false;
-  let preferredRenderMode: '3d' | '2d' = '3d';
-  let currentCollar: CollarColorId = 'none';
   let headphonesOn = false;
-  let orbitMode = false;
-  let orbitDragging = false;
-  let lastOrbitX = 0;
-  let lastOrbitY = 0;
 
-  let currentLayout: KeyboardLayoutId = '65';
+  const currentLayout: KeyboardLayoutId = '65';
   let currentOrient: KeyboardOrientation = 'cat';
-  let currentSkinId = 'black';
+  let currentSkinId = BUILTIN_WEB_CATS[0].id;
   let currentTailMode: TailKeyMode = 'smart';
   let currentTailKeyIds: string[] = [...DEFAULT_TAIL_KEY_IDS];
   let tailPickerOpen = false;
@@ -272,97 +260,18 @@ function initPlayground(): void {
   const webTailPickerTitle = document.getElementById('web-tail-picker-title');
   const btnWebTailPicker = document.getElementById('btn-web-tail-picker');
   const btnWebTailDone = document.getElementById('btn-web-tail-done');
-  const webCollarRow = document.getElementById('web-collar-row');
   const btnWebHeadphones = document.getElementById('btn-web-headphones');
-  const btnWebOrbit = document.getElementById('btn-web-orbit');
 
-  const getActiveSkin = () => BUILTIN_WEB_CATS.find((c) => c.id === currentSkinId) ?? BUILTIN_WEB_CATS[0];
-
-  const wants3D = () =>
-    Boolean(canvas3d) &&
-    preferredRenderMode === '3d' &&
-    currentSkinId !== 'dafeiyu' &&
-    !tailPickerOpen &&
-    !webgl3dBlocked;
-
-  const sync3DState = () => {
-    if (!engine3d) return;
-    engine3d.showKeyBubbles = engine.showKeyBubbles;
-    engine3d.setRenderStyle('3d');
-    engine3d.setCatSkin(getActiveSkin());
-    engine3d.setCollar(currentCollar);
-    engine3d.setHeadphones(headphonesOn && currentSkinId !== 'dafeiyu');
-    engine3d.setKeyboardConfig(currentLayout, currentOrient);
-    engine3d.setTailKeyConfig(currentTailMode, currentTailKeyIds);
-    engine3d.setPrivacyMode(engine.privacyMode);
-  };
-
-  const syncRenderEngine = () => {
-    const use3d = wants3D();
-    document.querySelectorAll<HTMLButtonElement>('[data-web-rendermode]').forEach((b) => {
-      b.classList.toggle('active', b.dataset.webRendermode === preferredRenderMode);
-    });
-    webCollarRow?.classList.toggle('hidden', !use3d);
-    btnWebOrbit?.classList.toggle('hidden', !use3d);
-    btnWebHeadphones?.classList.toggle('hidden', currentSkinId === 'dafeiyu');
-    if (!use3d) {
-      orbitMode = false;
-      orbitDragging = false;
-      btnWebOrbit?.classList.remove('active');
-      viewport.classList.remove('orbit-active', 'orbit-dragging');
-      if (active3d) {
-        engine3d?.stop();
-        canvas3d?.classList.add('hidden');
-        canvas.classList.remove('hidden');
-        engine.resize();
-        engine.start();
-        active3d = false;
-      }
-      return;
-    }
-
-    if (engine3d && canvas3d) {
-      sync3DState();
-      if (!active3d) {
-        engine.stop();
-        canvas.classList.add('hidden');
-        canvas3d.classList.remove('hidden');
-        engine3d.resize();
-        engine3d.start();
-        active3d = true;
-      }
-      return;
-    }
-
-    if (canvas3d && !loading3d) {
-      loading3d = import('../../src/catEngine3d')
-        .then(({ KuroCatEngine3D }) => {
-          engine3d = new KuroCatEngine3D(canvas3d, { embedded: true });
-          sync3DState();
-          syncRenderEngine();
-        })
-        .catch(() => {
-          webgl3dBlocked = true;
-          preferredRenderMode = '2d';
-          syncRenderEngine();
-        })
-        .finally(() => {
-          loading3d = null;
-        });
-    }
-  };
 
   const updateStatusPill = () => {
     if (!statusPill) return;
     const layoutText = i18n.fmt.layout(currentLayout);
     const orientText = i18n.fmt.orient(currentOrient);
-    const modeTag = wants3D() ? '3D' : '2D';
-    statusPill.textContent = `${modeTag} · ${layoutText} · ${orientText} · ${i18n.tailModeShort[currentTailMode]}`;
+    statusPill.textContent = `${layoutText} · ${orientText} · ${i18n.tailModeShort[currentTailMode]}`;
   };
 
   const syncTailUI = () => {
     engine.setTailKeyConfig(currentTailMode, currentTailKeyIds);
-    engine3d?.setTailKeyConfig(currentTailMode, currentTailKeyIds);
     document.querySelectorAll<HTMLButtonElement>('[data-web-tailmode]').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.webTailmode === currentTailMode);
     });
@@ -394,7 +303,6 @@ function initPlayground(): void {
       viewport.classList.remove('tail-key-hover');
     }
     engine.setTailPickerActive(open);
-    syncRenderEngine();
     syncTailUI();
   };
 
@@ -418,73 +326,23 @@ function initPlayground(): void {
     }
   };
 
-  engine.setCatAppearance('black', BUILTIN_WEB_CATS[0]);
+  engine.setCatAppearance(currentSkinId, BUILTIN_WEB_CATS[0]);
   engine.setKeyboardConfig(currentLayout, currentOrient);
   engine.start();
   syncTailUI();
-  syncRenderEngine();
 
   const ro = new ResizeObserver(() => {
     engine.resize();
-    engine3d?.resize();
   });
   ro.observe(viewport);
-
-  // 3D / 2D visual mode switch
-  document.querySelectorAll<HTMLButtonElement>('[data-web-rendermode]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const m = btn.dataset.webRendermode === '2d' ? '2d' : '3d';
-      preferredRenderMode = m;
-      if (m === '3d' && currentSkinId === 'dafeiyu') {
-        const black = BUILTIN_WEB_CATS[0];
-        currentSkinId = black.id;
-        engine.setCatAppearance(black.id, black);
-        skinHost?.querySelectorAll('.skin-btn').forEach((el) => {
-          el.classList.toggle('active', (el as HTMLElement).dataset.skinId === black.id);
-        });
-      }
-      if (m === '3d' && tailPickerOpen) {
-        setTailPickerOpen(false);
-      }
-      syncRenderEngine();
-      updateStatusPill();
-    });
-  });
 
   // Gaming headset toggle (works in both 3D & 2D!)
   btnWebHeadphones?.addEventListener('click', () => {
     headphonesOn = !headphonesOn;
     btnWebHeadphones.classList.toggle('active', headphonesOn);
-    engine.setHeadphones(headphonesOn && currentSkinId !== 'dafeiyu');
-    engine3d?.setHeadphones(headphonesOn && currentSkinId !== 'dafeiyu');
+    engine.setHeadphones(headphonesOn);
   });
 
-  // 3D collar switcher
-  document.querySelectorAll<HTMLButtonElement>('[data-web-collar]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const raw = btn.dataset.webCollar;
-      const c: CollarColorId =
-        raw === 'red' || raw === 'blue' || raw === 'pink' || raw === 'green' ? raw : 'none';
-      currentCollar = c;
-      engine3d?.setCollar(c);
-      document.querySelectorAll<HTMLButtonElement>('[data-web-collar]').forEach((b) => {
-        b.classList.toggle('active', b.dataset.webCollar === c);
-      });
-    });
-  });
-
-  // 360° 3D Orbit toggle
-  btnWebOrbit?.addEventListener('click', () => {
-    if (!active3d) return;
-    orbitMode = !orbitMode;
-    btnWebOrbit.classList.toggle('active', orbitMode);
-    viewport.classList.toggle('orbit-active', orbitMode);
-    if (!orbitMode) {
-      orbitDragging = false;
-      viewport.classList.remove('orbit-dragging');
-      engine3d?.resetOrbit();
-    }
-  });
 
   // Build 7 skin buttons (re-labeled automatically when switching language)
   const skinHost = document.getElementById('skin-pills');
@@ -509,12 +367,7 @@ function initPlayground(): void {
       btn.addEventListener('click', () => {
         currentSkinId = skin.id;
         engine.setCatAppearance(skin.id, skin);
-        engine.setHeadphones(headphonesOn && skin.id !== 'dafeiyu');
-        if (skin.id !== 'dafeiyu') {
-          engine3d?.setCatSkin(skin);
-          engine3d?.setHeadphones(headphonesOn);
-        }
-        syncRenderEngine();
+        engine.setHeadphones(headphonesOn);
         updateStatusPill();
         skinHost.querySelectorAll('.skin-btn').forEach((el) => {
           el.classList.toggle('active', (el as HTMLElement).dataset.skinId === skin.id);
@@ -524,33 +377,14 @@ function initPlayground(): void {
     });
   }
 
-  // Layout & Orientation buttons
-  const setLayout = (layout: KeyboardLayoutId) => {
-    currentLayout = layout;
-    engine.setKeyboardConfig(currentLayout, currentOrient);
-    engine3d?.setKeyboardConfig(currentLayout, currentOrient);
-    document.querySelectorAll('[data-layout]').forEach((el) => {
-      el.classList.toggle('active', (el as HTMLElement).dataset.layout === layout);
-    });
-    updateStatusPill();
-  };
-
   const setOrient = (orient: KeyboardOrientation) => {
     currentOrient = orient;
     engine.setKeyboardConfig(currentLayout, currentOrient);
-    engine3d?.setKeyboardConfig(currentLayout, currentOrient);
     document.querySelectorAll('[data-orient]').forEach((el) => {
       el.classList.toggle('active', (el as HTMLElement).dataset.orient === orient);
     });
     updateStatusPill();
   };
-
-  document.querySelectorAll('[data-layout]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const val = (btn as HTMLElement).dataset.layout === '108' ? '108' : '65';
-      setLayout(val);
-    });
-  });
 
   document.querySelectorAll('[data-orient]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -615,37 +449,6 @@ function initPlayground(): void {
     }
   });
 
-  // Feature card button to jump & test 108-key
-  const try108Btn = document.getElementById('try-108-btn');
-  if (try108Btn) {
-    try108Btn.addEventListener('click', () => {
-      setLayout('108');
-      setOrient('viewer');
-      document.getElementById('playground')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      startAutoDemo();
-    });
-  }
-
-  // Feature card button to switch live playground directly to BigFish (鲸鱼娘)
-  const tryDafeiyuBtn = document.getElementById('try-dafeiyu-btn');
-  if (tryDafeiyuBtn) {
-    tryDafeiyuBtn.addEventListener('click', () => {
-      const fish = BUILTIN_WEB_CATS.find((c) => c.id === 'dafeiyu');
-      if (fish) {
-        currentSkinId = fish.id;
-        engine.setCatAppearance(fish.id, fish);
-        syncRenderEngine();
-        skinHost?.querySelectorAll('.skin-btn').forEach((el) => {
-          el.classList.toggle('active', (el as HTMLElement).dataset.skinId === fish.id);
-        });
-      }
-      setLayout('65');
-      setOrient('viewer');
-      document.getElementById('playground')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      startAutoDemo();
-    });
-  }
-
   // Whale demo vertical video sound toggle
   const whaleVideo = document.getElementById('whale-demo-video') as HTMLVideoElement | null;
   const whaleSoundBtn = document.getElementById('whale-sound-toggle');
@@ -684,7 +487,6 @@ function initPlayground(): void {
   if (btnBubbles) {
     btnBubbles.addEventListener('click', () => {
       engine.showKeyBubbles = !engine.showKeyBubbles;
-      if (engine3d) engine3d.showKeyBubbles = engine.showKeyBubbles;
       btnBubbles.classList.toggle('active', engine.showKeyBubbles);
     });
   }
@@ -707,7 +509,6 @@ function initPlayground(): void {
   const syncPrivacyState = () => {
     const active = manualPrivacyPinned || pwdInputFocused;
     engine.setPrivacyMode(active);
-    engine3d?.setPrivacyMode(active);
     if (btnPrivacy) {
       btnPrivacy.classList.toggle('active', active);
       btnPrivacy.textContent = i18n.fmt.privacyBtn(active);
@@ -732,7 +533,6 @@ function initPlayground(): void {
     });
     pwdInput.addEventListener('keydown', () => {
       engine.onPrivacyTyping();
-      engine3d?.onPrivacyTyping();
     });
   }
 
@@ -744,12 +544,10 @@ function initPlayground(): void {
       syncPrivacyState();
     }
     if (currentSkinId === 'dafeiyu') {
-      const black = BUILTIN_WEB_CATS.find((c) => c.id === 'black');
+      const black = BUILTIN_WEB_CATS.find((c) => c.id === 'photo-uu');
       if (black) {
         currentSkinId = black.id;
         engine.setCatAppearance(black.id, black);
-        engine3d?.setCatSkin(black);
-        syncRenderEngine();
         skinHost?.querySelectorAll('.skin-btn').forEach((el) => {
           el.classList.toggle('active', (el as HTMLElement).dataset.skinId === black.id);
         });
@@ -759,17 +557,14 @@ function initPlayground(): void {
   document.getElementById('btn-curious-demo')?.addEventListener('click', () => {
     ensureCatForEmotion();
     engine.triggerCuriousDemo(3600);
-    engine3d?.triggerCuriousDemo(3.6);
   });
   document.getElementById('btn-cross-demo')?.addEventListener('click', () => {
     ensureCatForEmotion();
     engine.triggerCrossDemo();
-    engine3d?.triggerCrossDemo();
   });
   document.getElementById('btn-sleep-demo')?.addEventListener('click', () => {
     ensureCatForEmotion();
     engine.triggerSleepDemo();
-    engine3d?.triggerSleepDemo();
   });
 
   // Scale slider (20% - 150%)
@@ -778,15 +573,15 @@ function initPlayground(): void {
   const applyScalePct = (pct: number) => {
     const clamped = Math.max(20, Math.min(150, Math.round(pct)));
     engine.setRenderScale(clamped / 100);
-    engine3d?.setRenderScale(clamped / 100);
     if (scaleSlider) scaleSlider.value = String(clamped);
     if (scaleValBtn) scaleValBtn.textContent = `${clamped}%`;
   };
+  applyScalePct(60);
   if (scaleSlider) {
     scaleSlider.addEventListener('input', () => applyScalePct(Number(scaleSlider.value)));
   }
   if (scaleValBtn) {
-    scaleValBtn.addEventListener('click', () => applyScalePct(100));
+    scaleValBtn.addEventListener('click', () => applyScalePct(60));
   }
 
   // Auto-demo choreography (stops immediately when user starts typing/clicking)
@@ -826,17 +621,13 @@ function initPlayground(): void {
     demoStep += 1;
     if (item.type === 'key') {
       engine.onKeyDown(item.vk, false);
-      engine3d?.onKeyDown(item.vk, false);
       window.setTimeout(() => {
         engine.onKeyUp(item.vk);
-        engine3d?.onKeyUp(item.vk);
       }, item.hold);
     } else {
       engine.onMouseDown(item.btn);
-      engine3d?.onMouseDown(item.btn);
       window.setTimeout(() => {
         engine.onMouseUp(item.btn);
-        engine3d?.onMouseUp(item.btn);
       }, item.hold);
     }
     autoDemoTimer = window.setTimeout(runDemoTick, item.gap);
@@ -875,16 +666,12 @@ function initPlayground(): void {
     btnMouseDemo.addEventListener('click', () => {
       stopAutoDemo();
       engine.onMouseDown('left');
-      engine3d?.onMouseDown('left');
       window.setTimeout(() => {
         engine.onMouseUp('left');
-        engine3d?.onMouseUp('left');
         window.setTimeout(() => {
           engine.onMouseDown('right');
-          engine3d?.onMouseDown('right');
           window.setTimeout(() => {
             engine.onMouseUp('right');
-            engine3d?.onMouseUp('right');
           }, 320);
         }, 120);
       }, 320);
@@ -898,7 +685,6 @@ function initPlayground(): void {
     if (engine.privacyMode) {
       if (autoDemoRunning) stopAutoDemo();
       engine.onPrivacyTyping();
-      engine3d?.onPrivacyTyping();
       return;
     }
     const vk = keyboardEventToVk(e);
@@ -917,7 +703,6 @@ function initPlayground(): void {
         return;
       }
       engine.onKeyDown(vk, e.repeat);
-      engine3d?.onKeyDown(vk, e.repeat);
     }
   });
 
@@ -926,20 +711,11 @@ function initPlayground(): void {
     const vk = keyboardEventToVk(e);
     if (vk !== null) {
       engine.onKeyUp(vk);
-      engine3d?.onKeyUp(vk);
     }
   });
 
   // Full-window silky eye tracking + stage-scoped mouse move & petting (zero snap-back at canvas border!)
   window.addEventListener('pointermove', (e) => {
-    if (active3d && orbitMode && orbitDragging) {
-      const dx = e.clientX - lastOrbitX;
-      const dy = e.clientY - lastOrbitY;
-      lastOrbitX = e.clientX;
-      lastOrbitY = e.clientY;
-      engine3d?.addOrbitDelta(-dx * 0.45, dy * 0.30);
-      return;
-    }
 
     const rect = viewport.getBoundingClientRect();
     if (rect.width < 4 || rect.height < 4) return;
@@ -949,11 +725,6 @@ function initPlayground(): void {
       e.clientY >= rect.top &&
       e.clientY <= rect.bottom;
 
-    if (active3d && engine3d) {
-      const overHead = engine3d.onPointerMove(e.clientX, e.clientY, insideViewport, !orbitMode);
-      viewport.classList.toggle('petting', overHead && !orbitMode);
-      return;
-    }
 
     if (tailPickerOpen) {
       if (insideViewport) {
@@ -1000,14 +771,6 @@ function initPlayground(): void {
   });
 
   viewport.addEventListener('pointerdown', (e) => {
-    if (active3d && orbitMode) {
-      orbitDragging = true;
-      lastOrbitX = e.clientX;
-      lastOrbitY = e.clientY;
-      viewport.classList.add('orbit-dragging');
-      viewport.setPointerCapture(e.pointerId);
-      return;
-    }
     if (autoDemoRunning) stopAutoDemo();
     if (tailPickerOpen && e.button === 0) {
       const hit = engine.hitTestKeyAtClientPoint(e.clientX, e.clientY);
@@ -1019,18 +782,11 @@ function initPlayground(): void {
     }
     const btnName = e.button === 2 ? 'right' : e.button === 1 ? 'middle' : 'left';
     engine.onMouseDown(btnName);
-    engine3d?.onMouseDown(btnName);
   });
 
   window.addEventListener('pointerup', (e) => {
-    if (orbitDragging) {
-      orbitDragging = false;
-      viewport.classList.remove('orbit-dragging');
-      return;
-    }
     const btnName = e.button === 2 ? 'right' : e.button === 1 ? 'middle' : 'left';
     engine.onMouseUp(btnName);
-    engine3d?.onMouseUp(btnName);
   });
 
   viewport.addEventListener('contextmenu', (e) => {
@@ -1039,7 +795,6 @@ function initPlayground(): void {
 
   viewport.addEventListener('wheel', () => {
     engine.onMouseWheel();
-    engine3d?.onMouseWheel();
   }, { passive: true });
 
   // Kick off gentle live demo on load!

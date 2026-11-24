@@ -1,3 +1,6 @@
+import uu from '../website/public/skins/UU.json';
+import mimi from '../website/public/skins/mimi.json';
+
 export interface CatSpot {
   part: 'head' | 'body' | 'leftArm' | 'rightArm';
   x: number;
@@ -9,13 +12,65 @@ export interface CatSpot {
   opacity?: number;
 }
 
-export type CatPattern = 'solid' | 'bicolor' | 'tuxedo' | 'tabby' | 'calico' | 'siamese';
+export type CatPattern = 'solid' | 'bicolor' | 'lynx-bicolor' | 'tuxedo' | 'tabby' | 'calico' | 'siamese';
+
+interface PhotoEye {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+}
+
+export type PhotoRect = [x: number, y: number, width: number, height: number];
+
+export interface PhotoRig {
+  head: PhotoRect;
+  body: PhotoRect;
+  tail: PhotoRect;
+  upperLeg: PhotoRect;
+  foreleg: PhotoRect;
+  collar?: PhotoRect;
+  classicPose?: boolean;
+  tuckPaws?: boolean;
+  joinedNeck?: boolean;
+  headDrop?: number;
+  tailScale?: number;
+  tailRootRight?: boolean;
+  frontTail?: boolean;
+  originalPaws?: boolean;
+  showRestingForelegs?: boolean;
+  roundPaws?: boolean;
+  classicPawMotion?: boolean;
+  twoToneForelegs?: boolean;
+}
+
+export interface CatPhoto {
+  png: string;
+  eyes: [PhotoEye, PhotoEye];
+  rig?: PhotoRig;
+  pixelArt?: boolean;
+  smoothEdges?: boolean;
+}
+
+export interface CatPortrait {
+  eyeGap: number;
+  eyes: [
+    { rx: number; ry: number; y: number; tilt: number; irisShade?: number },
+    { rx: number; ry: number; y: number; tilt: number; irisShade?: number },
+  ];
+  cheekScale: number;
+  muzzleDrop: number;
+  chestRuff?: boolean;
+  frontTail?: boolean;
+}
 
 export interface CatSkinConfig {
   id: string;
   name: string;
   emoji?: string;
   builtin?: boolean;
+  photo?: CatPhoto;
+  portrait?: CatPortrait;
 
   furColor: string;
   furSecondaryColor?: string;
@@ -66,6 +121,7 @@ export interface CatSkinConfig {
 export interface ResolvedSkin {
   id: string;
   name: string;
+  portrait?: CatPortrait;
   isDarkBase: boolean;
   furColor: string;
   furSecondaryColor: string;
@@ -134,6 +190,7 @@ export function resolveCustomSkin(raw: CatSkinConfig): ResolvedSkin {
   return {
     id: raw.id,
     name: raw.name || raw.id,
+    portrait: raw.portrait,
     isDarkBase: darkBase,
     furColor: fur,
     furSecondaryColor: raw.furSecondaryColor || fur,
@@ -187,34 +244,6 @@ export function resolveCustomSkin(raw: CatSkinConfig): ResolvedSkin {
 }
 
 export const DEFAULT_BUILTIN_CATS: CatSkinConfig[] = [
-  {
-    id: 'black',
-    name: '小黑猫',
-    emoji: '🐈‍⬛',
-    builtin: true,
-    furColor: '#141314',
-    eyeColorTop: '#d4f044',
-    accentColor: '#d2f244',
-    accentSideColor: '#8cb014',
-  },
-  {
-    id: 'ragdoll',
-    name: '布偶猫',
-    emoji: '🐱',
-    builtin: true,
-    furColor: '#fbf9f3',
-    eyeColorTop: '#2c5594',
-    accentColor: '#7ac7ff',
-    accentSideColor: '#4690d8',
-  },
-  {
-    id: 'dafeiyu',
-    name: '大肥鱼',
-    emoji: '🐳',
-    builtin: true,
-    furColor: '#2957a4',
-    eyeColorTop: '#2563eb',
-    accentColor: '#5cc8ff',
-    accentSideColor: '#2563eb',
-  },
+  uu as unknown as CatSkinConfig,
+  mimi as unknown as CatSkinConfig,
 ];

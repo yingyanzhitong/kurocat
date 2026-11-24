@@ -27,6 +27,7 @@ usage() {
 Usage:
   scripts/macos-codesign.sh create-cert <output-dir>
   scripts/macos-codesign.sh sign <KuroCat.app>
+  scripts/macos-codesign.sh sign-local <KuroCat.app>
   scripts/macos-codesign.sh requirement <KuroCat.app>
   scripts/macos-codesign.sh verify <KuroCat.app> [designated-requirement]
   scripts/macos-codesign.sh verify-artifact <file.dmg|file.app.tar.gz> <designated-requirement>
@@ -160,6 +161,29 @@ sign_app() {
   fi
 }
 
+sign_local_app() {
+  local app="$1"
+  local signing_dir="$HOME/Library/Application Support/KuroCat Local Signing"
+  if [[ ! -f "$signing_dir/kurocat-signing.p12" ]]; then
+    (CERT_NAME="KuroCat Local Code Signing"; create_cert "$signing_dir") >/dev/null
+  fi
+
+  # Reuse the same certificate for every local reinstall so macOS recognizes the app.
+  if [[ -x "$signing_dir/rcodesign" ]]; then
+    "$signing_dir/rcodesign" sign --timestamp-url none \
+      --p12-file "$signing_dir/kurocat-signing.p12" \
+      --p12-password-file "$signing_dir/kurocat-signing.password" "$app"
+    verify_app "$app"
+    print_requirement "$app"
+    return
+  fi
+
+  local MACOS_SIGNING_CERT_P12_BASE64 MACOS_SIGNING_CERT_PASSWORD
+  MACOS_SIGNING_CERT_P12_BASE64="$(cat "$signing_dir/kurocat-signing.p12.base64")"
+  MACOS_SIGNING_CERT_PASSWORD="$(cat "$signing_dir/kurocat-signing.password")"
+  sign_app "$app"
+}
+
 verify_artifact() {
   local file="$1" requirement="$2" app="" mounted="" attempt
   [[ -f "$file" ]] || die "release artifact not found: $file"
@@ -256,6 +280,7 @@ EOF
 case "${1:-}" in
   create-cert) [[ $# -eq 2 ]] || usage; create_cert "$2" ;;
   sign) [[ $# -eq 2 ]] || usage; sign_app "$2" ;;
+  sign-local) [[ $# -eq 2 ]] || usage; sign_local_app "$2" ;;
   requirement) [[ $# -eq 2 ]] || usage; print_requirement "$2" ;;
   verify) [[ $# -ge 2 && $# -le 3 ]] || usage; verify_app "$2" "${3:-}" ;;
   verify-artifact) [[ $# -eq 3 ]] || usage; verify_artifact "$2" "$3" ;;

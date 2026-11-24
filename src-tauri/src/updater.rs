@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter};
 
-const REPO_API_LATEST: &str = "https://api.github.com/repos/qianyiai/kurocat/releases/latest";
-const REPO_RELEASES_PAGE: &str = "https://github.com/qianyiai/kurocat/releases/latest";
+const REPO_API_LATEST: &str = "https://api.github.com/repos/yingyanzhitong/kurocat/releases/latest";
+pub const REPO_RELEASES_PAGE: &str = "https://github.com/yingyanzhitong/kurocat/releases";
 
 pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -571,7 +571,7 @@ mod winhttp_client {
 fn fetch_latest_release_json() -> Result<String, String> {
     let ua = format!("KuroCat/{}", CURRENT_VERSION);
     let mut body = Vec::with_capacity(8192);
-    winhttp_client::get_stream(
+    let response = winhttp_client::get_stream(
         REPO_API_LATEST,
         &ua,
         Some("Accept: application/vnd.github+json\r\n"),
@@ -583,7 +583,13 @@ fn fetch_latest_release_json() -> Result<String, String> {
             body.extend_from_slice(chunk);
             Ok(())
         },
-    )?;
+    );
+    if let Err(error) = response {
+        if error == "服务器返回 HTTP 404" {
+            return Ok("null".to_string());
+        }
+        return Err(error);
+    }
 
     let text = String::from_utf8_lossy(&body).trim().to_string();
     if text.is_empty() {
@@ -603,7 +609,9 @@ fn fetch_latest_release_json() -> Result<String, String> {
     };
     let output = Command::new(curl_bin)
         .args([
-            "-fsSL",
+            "-sSL",
+            "--write-out",
+            "\n%{http_code}",
             "--connect-timeout",
             "10",
             "--max-time",
@@ -626,7 +634,16 @@ fn fetch_latest_release_json() -> Result<String, String> {
         });
     }
 
-    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let response = String::from_utf8_lossy(&output.stdout);
+    let (body, status) = response
+        .rsplit_once('\n')
+        .ok_or_else(|| "无法读取更新接口状态码".to_string())?;
+    match status {
+        "404" => return Ok("null".to_string()),
+        "200" => {}
+        _ => return Err(format!("更新接口返回 HTTP {}", status)),
+    }
+    let text = body.trim().to_string();
     if text.is_empty() {
         return Err("GitHub 返回空响应".to_string());
     }
@@ -635,8 +652,22 @@ fn fetch_latest_release_json() -> Result<String, String> {
 
 pub fn check_latest_update() -> Result<UpdateInfo, String> {
     let raw_json = fetch_latest_release_json()?;
-    let rel: GhRelease = serde_json::from_str(&raw_json)
+    let release: Option<GhRelease> = serde_json::from_str(&raw_json)
         .map_err(|e| format!("解析最新版本信息失败: {}", e))?;
+    let Some(rel) = release else {
+        return Ok(UpdateInfo {
+            current_version: CURRENT_VERSION.to_string(),
+            latest_version: String::new(),
+            has_update: false,
+            release_url: REPO_RELEASES_PAGE.to_string(),
+            asset_name: None,
+            download_url: None,
+            asset_sha256: None,
+            asset_size: None,
+            install_kind: detect_install_kind().to_string(),
+            notes_summary: String::new(),
+        });
+    };
 
     let latest_clean = rel
         .tag_name
@@ -1124,11 +1155,11 @@ mod tests {
     #[test]
     fn http_url_parser_handles_github_endpoints() {
         let (https, host, port, path) =
-            parse_http_url("https://api.github.com/repos/qianyiai/kurocat/releases/latest").unwrap();
+            parse_http_url("https://api.github.com/repos/yingyanzhitong/kurocat/releases/latest").unwrap();
         assert!(https);
         assert_eq!(host, "api.github.com");
         assert_eq!(port, 443);
-        assert_eq!(path, "/repos/qianyiai/kurocat/releases/latest");
+        assert_eq!(path, "/repos/yingyanzhitong/kurocat/releases/latest");
 
         let (https2, host2, port2, path2) =
             parse_http_url("http://127.0.0.1:8080/dl?v=1").unwrap();
@@ -1141,8 +1172,11 @@ mod tests {
     #[test]
     #[ignore = "requires live internet access to GitHub API"]
     fn live_check_latest_update_uses_native_http() {
-        let info = check_latest_update().expect("native WinHTTP release check should succeed");
-        assert!(!info.latest_version.is_empty());
-        assert!(info.download_url.is_some());
+        let info = check_latest_update().expect("repository release check should succeed");
+        assert!(info.release_url.starts_with(REPO_RELEASES_PAGE));
+        if info.latest_version.is_empty() {
+            assert!(!info.has_update);
+            assert!(info.download_url.is_none());
+        }
     }
 }

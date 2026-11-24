@@ -1,4 +1,5 @@
 import './style.css';
+import { bindSkinImport } from './skinImport';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { DEFAULT_TAIL_KEY_IDS, type KeyboardOrientation, type TailKeyMode } from './catEngine';
@@ -19,14 +20,13 @@ interface AppSettings {
   mcpPort: number;
   keyboardLayout: KeyboardLayoutId;
   keyboardOrientation: KeyboardOrientation;
+  useTouchpad?: boolean;
   privacyPasswordGuard: boolean;
   tailKeyMode: TailKeyMode;
   tailKeyIds: string[];
   obsEnabled: boolean;
   obsPort: number;
   obsHidePet: boolean;
-  renderMode?: '2d' | '3d';
-  collarColor?: 'none' | 'red' | 'blue' | 'pink' | 'green';
   headphoneMode?: 'auto' | 'on' | 'off';
 }
 
@@ -53,13 +53,13 @@ const TAIL_MODE_LABELS: Record<TailKeyMode, string> = {
 let settings: AppSettings = {
   x: null,
   y: null,
-  scale: 1,
+  scale: 0.6,
   alwaysOnTop: true,
   clickThroughLocked: false,
   showKeyBubbles: true,
   soundEnabled: true,
   autostart: false,
-  catBreed: 'black',
+  catBreed: 'photo-uu',
   mcpEnabled: true,
   mcpPort: 27420,
   keyboardLayout: '65',
@@ -70,8 +70,6 @@ let settings: AppSettings = {
   obsEnabled: false,
   obsPort: 27421,
   obsHidePet: false,
-  renderMode: '3d',
-  collarColor: 'none',
   headphoneMode: 'off',
 };
 
@@ -128,6 +126,12 @@ function syncUI(): void {
 
   setCheck('chk-privacy', settings.privacyPasswordGuard !== false);
   setCheck('chk-bubbles', settings.showKeyBubbles);
+  const pointerAction = settings.useTouchpad === true ? 'select-touchpad' : 'select-mouse';
+  document.querySelectorAll<HTMLButtonElement>('[data-action="select-mouse"], [data-action="select-touchpad"]').forEach((btn) => {
+    const selected = btn.dataset.action === pointerAction;
+    btn.classList.toggle('active', selected);
+    btn.setAttribute('aria-pressed', String(selected));
+  });
   setCheck('chk-lock', settings.clickThroughLocked);
   setCheck('chk-sound', settings.soundEnabled);
   setCheck('chk-top', settings.alwaysOnTop);
@@ -148,11 +152,7 @@ function syncUI(): void {
     updateScaleSliderVisual(settings.scale);
   }
 
-  const kbLayout: KeyboardLayoutId = settings.keyboardLayout === '108' ? '108' : '65';
   const kbOrient: KeyboardOrientation = settings.keyboardOrientation === 'viewer' ? 'viewer' : 'cat';
-  document.querySelectorAll<HTMLButtonElement>('[data-kblayout]').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.kblayout === kbLayout);
-  });
   document.querySelectorAll<HTMLButtonElement>('[data-kborient]').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.kborient === kbOrient);
   });
@@ -177,24 +177,6 @@ function syncUI(): void {
   const activeCat = catList.find((c) => c.id === settings.catBreed) ?? catList[0];
   renderBreedPills();
 
-  const renderMode = settings.renderMode === '2d' ? '2d' : '3d';
-  const collarColor =
-    settings.collarColor === 'red' ||
-    settings.collarColor === 'blue' ||
-    settings.collarColor === 'pink' ||
-    settings.collarColor === 'green'
-      ? settings.collarColor
-      : 'none';
-  document.querySelectorAll<HTMLButtonElement>('[data-rendermode]').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.rendermode === renderMode);
-  });
-  document.querySelectorAll<HTMLButtonElement>('[data-collar]').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.collar === collarColor);
-  });
-  const collarRowEl = document.getElementById('collar-row');
-  if (collarRowEl) {
-    collarRowEl.classList.toggle('hidden', renderMode === '2d' || settings.catBreed === 'dafeiyu');
-  }
 
   const headphoneMode =
     settings.headphoneMode === 'auto' || settings.headphoneMode === 'on'
@@ -203,10 +185,6 @@ function syncUI(): void {
   document.querySelectorAll<HTMLButtonElement>('[data-headphonemode]').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.headphonemode === headphoneMode);
   });
-  const headphoneRowEl = document.getElementById('headphone-row');
-  if (headphoneRowEl) {
-    headphoneRowEl.classList.toggle('hidden', settings.catBreed === 'dafeiyu');
-  }
 
   const headerEl = document.getElementById('menu-header');
   if (headerEl && activeCat) {
@@ -314,7 +292,7 @@ async function triggerManualUpdateCheck(): Promise<void> {
         void invoke('open_release_page', { url: info.releaseUrl });
       }
     } else if (hint) {
-      hint.textContent = `最新 v${info.currentVersion}`;
+      hint.textContent = info.latestVersion ? `最新 v${info.currentVersion}` : '暂无发行版';
       setTimeout(() => {
         hint.textContent = `v${currentAppVersion}`;
       }, 2200);
@@ -387,13 +365,14 @@ async function bootstrap(): Promise<void> {
       e.stopPropagation();
       sliderDragging = false;
       updateScaleSliderVisual(1.0);
-      void applySettingsPatch({ scale: 1.0 });
+      void applySettingsPatch({ scale: 0.6 });
     });
   }
 
+  const openSkinFile = bindSkinImport();
   menuEl.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest<HTMLElement>(
-      '[data-action], [data-breed], [data-rendermode], [data-collar], [data-headphonemode], [data-kblayout], [data-kborient], [data-tailmode]',
+      '[data-action], [data-breed], [data-headphonemode], [data-kborient], [data-tailmode]',
     );
     if (!target) return;
 
@@ -403,29 +382,6 @@ async function bootstrap(): Promise<void> {
       return;
     }
 
-    const renderModeAttr = target.dataset.rendermode;
-    if (renderModeAttr === '2d' || renderModeAttr === '3d') {
-      void applySettingsPatch({ renderMode: renderModeAttr });
-      return;
-    }
-
-    const collarAttr = target.dataset.collar;
-    if (
-      collarAttr === 'none' ||
-      collarAttr === 'red' ||
-      collarAttr === 'blue' ||
-      collarAttr === 'pink' ||
-      collarAttr === 'green'
-    ) {
-      void applySettingsPatch({ collarColor: collarAttr });
-      return;
-    }
-
-    const kbLayoutAttr = target.dataset.kblayout;
-    if (kbLayoutAttr === '65' || kbLayoutAttr === '108') {
-      void applySettingsPatch({ keyboardLayout: kbLayoutAttr });
-      return;
-    }
 
     const kbOrientAttr = target.dataset.kborient;
     if (kbOrientAttr === 'cat' || kbOrientAttr === 'viewer') {
@@ -451,6 +407,13 @@ async function bootstrap(): Promise<void> {
     }
 
     switch (target.dataset.action) {
+      case 'import-cat-skin':
+        openSkinFile();
+        break;
+      case 'select-mouse':
+      case 'select-touchpad':
+        void applySettingsPatch({ useTouchpad: target.dataset.action === 'select-touchpad' });
+        break;
       case 'toggle-privacy':
         void applySettingsPatch({ privacyPasswordGuard: !(settings.privacyPasswordGuard !== false) });
         break;

@@ -1790,13 +1790,15 @@ dependencies = [
 
 [[package]]
 name = "kuro-cat-pet"
-version = "5.0.1"
+version = "5.0.2"
 dependencies = [
+ "base64 0.23.1",
  "block2",
  "objc2",
  "objc2-app-kit",
  "objc2-core-foundation",
  "objc2-foundation",
+ "png",
  "serde",
  "serde_json",
  "tauri",

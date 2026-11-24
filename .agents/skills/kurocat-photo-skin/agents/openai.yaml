@@ -1,0 +1,4 @@
+interface:
+  display_name: "KuroCat 照片生成皮肤"
+  short_description: "保留自家猫的脸型与花纹，生成可导入 KuroCat 的照片皮肤"
+  default_prompt: "用 $kurocat-photo-skin 根据这些猫咪照片生成可导入 KuroCat 的皮肤。"

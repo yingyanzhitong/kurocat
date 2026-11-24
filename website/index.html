@@ -16,7 +16,7 @@
   <meta property="og:image" content="https://qianyi.one/kurocat/assets/og-cover.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="KuroCat 免费开源桌面打字小黑猫伴侣预览图（65% / 108 键机械键盘与多款皮肤）" />
+  <meta property="og:image:alt" content="KuroCat 免费开源桌面打字小黑猫伴侣预览图（65% 紧凑键盘机械键盘与多款皮肤）" />
   <meta property="og:locale" content="zh_CN" />
   <meta property="og:locale:alternate" content="en_US" />
   <meta property="og:locale:alternate" content="ja_JP" />
@@ -56,7 +56,7 @@
           "KuroCat 桌面小黑猫",
           "KuroCat Desktop Pet"
         ],
-        "description": "Lightweight, transparent, always-on-top open-source desktop typing & mouse cat companion built with Tauri v2 and Rust. Features 6 hand-crafted cats + BigFish whale-girl, 65%/108-key layouts, customizable tail-key patting, native OBS transparent browser source, automatic password privacy guard, and a built-in MCP server for AI cat creation.",
+        "description": "Lightweight, transparent, always-on-top open-source desktop typing & mouse cat companion built with Tauri v2 and Rust. Features 6 hand-crafted cats + BigFish whale-girl, a compact 65% layout, customizable tail-key patting, native OBS transparent browser source, automatic password privacy guard, and a built-in MCP server for AI cat creation.",
         "applicationCategory": "UtilitiesApplication",
         "operatingSystem": "Windows 11, Windows 10, Windows 7, macOS, Linux, Android",
         "softwareVersion": "5.0.1",
@@ -153,8 +153,7 @@
         </h1>
 
         <p class="hero-sub" data-i18n-html="hero.sub">
-          基于 <strong>Tauri v2 + Rust 原生钩子 + Three.js 3D / Canvas 2D 双引擎</strong> 打造的透明置顶桌面键鼠伴侣。
-          默认 <strong>✨ 3D 体积光影手办模式</strong>（可一键切换 <strong>2D 经典手绘</strong>），安装包仅 <strong>2.15 MB</strong>；内置 <strong>6 款猫咪 + 🐳 大肥鱼（鲸鱼娘）</strong>、<strong>游戏自动戴电竞耳机</strong>、<strong>3D 项圈铃铛</strong>、<strong>自定义尾巴拍键</strong>、<strong>OBS 免抠像直播源</strong>、<strong>输密码自动闭眼防偷窥</strong> 与 <strong>MCP 协议 AI 捏猫</strong>（3D/2D 同步斑点）。
+          基于 Tauri 和 Canvas 2D 的桌面键鼠伴侣，可选择 UU 和咪咪。
         </p>
 
         <div class="hero-actions">
@@ -192,10 +191,6 @@
             <span class="playground-title" data-i18n="pg.title">实时网页引擎 · 直接敲键盘或摸猫头</span>
           </div>
           <div class="playground-bar-right">
-            <div class="backdrop-pills web-mode-pills" role="group" aria-label="3D / 2D 模式切换">
-              <button class="mini-pill active" data-web-rendermode="3d" type="button">✨ 3D 立体</button>
-              <button class="mini-pill" data-web-rendermode="2d" type="button">🎨 2D 经典</button>
-            </div>
             <div class="backdrop-pills" role="group" aria-label="预览桌布背景">
               <button class="mini-pill active" data-backdrop="dark" type="button" data-i18n="pg.bgDark">深色桌布</button>
               <button class="mini-pill" data-backdrop="light" type="button" data-i18n="pg.bgLight">浅色桌布</button>
@@ -205,7 +200,6 @@
 
         <div class="canvas-viewport backdrop-dark" id="canvas-viewport">
           <canvas id="kurocat-canvas" aria-label="KuroCat 2D 实时交互试玩画布"></canvas>
-          <canvas id="kurocat-canvas-3d" class="hidden" aria-label="KuroCat 3D 实时交互试玩画布"></canvas>
           <div class="stage-hint" id="stage-hint">
             <span data-i18n="pg.hintKey">⌨️ 敲键盘</span>
             <span data-i18n="pg.hintMouse">🖱️ 点左/右键</span>
@@ -236,10 +230,6 @@
           <!-- Row 2: Layout, Orientation & Actions -->
           <div class="dock-row dock-row-split">
             <div class="seg-group">
-              <div class="seg-control" role="group" aria-label="键盘配列">
-                <button class="seg-btn active" data-layout="65" type="button" data-i18n="pg.layout65">65% 紧凑</button>
-                <button class="seg-btn" data-layout="108" type="button" data-i18n="pg.layout108">108 全尺寸</button>
-              </div>
               <div class="seg-control" role="group" aria-label="键盘视角">
                 <button class="seg-btn active" data-orient="cat" type="button" data-i18n="pg.orientCat">面向猫咪</button>
                 <button class="seg-btn" data-orient="viewer" type="button" data-i18n="pg.orientViewer">面向观众</button>
@@ -255,19 +245,6 @@
               <button class="chip-btn active" id="btn-bubbles" type="button" title="开关悬浮按键气泡" data-i18n="pg.btnBubbles" data-i18n-title="pg.bubblesTitle">💬 气泡</button>
               <button class="chip-btn active" id="btn-purr" type="button" title="开关摸头呼噜声" data-i18n="pg.btnPurr" data-i18n-title="pg.purrTitle">🔊 呼噜</button>
               <button class="chip-btn" id="btn-web-headphones" type="button" title="开关电竞耳机（桌面端支持检测到游戏自动戴上）">🎧 电竞耳机</button>
-              <button class="chip-btn" id="btn-web-orbit" type="button" title="开启后在画布上拖动可 360° 旋转查看 3D 立体模型">🔄 360° 旋转</button>
-            </div>
-          </div>
-
-          <!-- Row 2.2: Optional 3D Collar & Bell -->
-          <div class="dock-row" id="web-collar-row">
-            <span class="dock-label">3D 项圈</span>
-            <div class="seg-control" role="group" aria-label="3D 项圈铃铛颜色">
-              <button class="seg-btn active" data-web-collar="none" type="button">无</button>
-              <button class="seg-btn" data-web-collar="red" type="button">🔴 红</button>
-              <button class="seg-btn" data-web-collar="blue" type="button">🔵 蓝</button>
-              <button class="seg-btn" data-web-collar="pink" type="button">🩷 粉</button>
-              <button class="seg-btn" data-web-collar="green" type="button">🟢 绿</button>
             </div>
           </div>
 
@@ -293,8 +270,8 @@
           <!-- Row 4: 20%-150% Smooth Scale Slider -->
           <div class="dock-row scale-row">
             <span class="dock-label" data-i18n="pg.lblScale">无级缩放</span>
-            <input id="web-scale-slider" class="scale-slider" type="range" min="20" max="150" step="1" value="100" aria-label="缩放比例 20% 到 150%" />
-            <button class="scale-val-btn" id="web-scale-val" type="button" title="点击重置为 100%" data-i18n-title="pg.scaleResetTitle">100%</button>
+            <input id="web-scale-slider" class="scale-slider" type="range" min="20" max="150" step="1" value="60" aria-label="缩放比例 20% 到 150%" />
+            <button class="scale-val-btn" id="web-scale-val" type="button" title="点击重置为 100%" data-i18n-title="pg.scaleResetTitle">60%</button>
           </div>
         </div>
       </div>
@@ -306,7 +283,7 @@
         <div class="eyebrow" data-i18n="dl.eyebrow">Direct Downloads · Cloudflare Edge CDN</div>
         <h2 class="section-title" data-i18n="dl.title">免费下载，3 秒住进你的桌面</h2>
         <p class="section-sub" data-i18n-html="dl.sub">
-          所有安装包均内置 <strong>20%–150% 无级缩放</strong>、<strong>65% / 108 键随时切换</strong> 与 <strong>App 内自动更新</strong>。<br />
+          所有安装包均内置 <strong>20%–150% 无级缩放</strong>、<strong>65% 紧凑键盘</strong> 与 <strong>App 内自动更新</strong>。<br />
           默认提供 <code>qianyi.one</code> 国内高速直链，同时保留 GitHub Releases 官方原链与 SHA-256 校验。
         </p>
       </div>
@@ -325,7 +302,7 @@
             <span class="dl-tag tag-lime" data-i18n="dl.winTag">推荐</span>
           </div>
           <p class="dl-desc" data-i18n-html="dl.winDesc">
-            开箱即 65% 紧凑机械键盘，自动创建桌面 <code>KuroCat</code> 图标、开始菜单与系统卸载入口；右键随时可一键切换 <strong>108 键全尺寸小键盘</strong>与内置自更新。
+            开箱即 65% 紧凑机械键盘，自动创建桌面 <code>KuroCat</code> 图标、开始菜单与系统卸载入口；右键随时可一键切换 <strong>键盘方向</strong>与内置自更新。
           </p>
           <div class="dl-meta">
             <span class="dl-filename" data-asset-name="win65">KuroCat-5.0.1-x64-setup.exe</span>
@@ -354,7 +331,7 @@
             <span class="dl-tag tag-subtle">Apple Silicon</span>
           </div>
           <p class="dl-desc" data-i18n-html="dl.macDesc">
-            原生编译 ARM64 + x86_64 通用镜像，兼容 M1/M2/M3/M4 与老款 Intel Mac（macOS 10.15 Catalina 及以上），内置 65% / 108 键、6 款猫咪与大肥鱼皮肤。打开 <code>.dmg</code> 拖入「应用程序」即可运行。
+            原生编译 ARM64 + x86_64 通用镜像，兼容 M1/M2/M3/M4 与老款 Intel Mac（macOS 10.15 Catalina 及以上），内置 65% 紧凑键盘、6 款猫咪与大肥鱼皮肤。打开 <code>.dmg</code> 拖入「应用程序」即可运行。
           </p>
           <div class="dl-meta">
             <span class="dl-filename" data-asset-name="macos">KuroCat-v5.0.1-macos-universal.dmg</span>
@@ -500,7 +477,6 @@
                 </div>
               </div>
               <div class="card-cta-row">
-                <button class="btn-lime" id="try-dafeiyu-btn" type="button" data-i18n="feat.whaleTryBtn">在上方画布切到大肥鱼试玩 ↑</button>
                 <a class="btn-outline" href="/kurocat/media/whale-douyin-14s.mp4" download="KuroCat-鲸鱼娘-14s竖屏演示.mp4" data-i18n="feat.whaleDlBtn">
                   下载 1080P 竖屏演示（14s）
                 </a>
@@ -525,40 +501,6 @@
                 <span class="whale-video-meta" data-i18n="feat.whaleMeta">1080×1920 · 60fps · 14s 含同步键鼠音效</span>
                 <button class="chip-btn" id="whale-sound-toggle" type="button">🔇 点此开启音效</button>
               </div>
-            </div>
-          </div>
-        </article>
-
-        <!-- Feature 1: 108-key + Orientation -->
-        <article class="stage-card reveal">
-          <div class="split-grid">
-            <div>
-              <div class="eyebrow">65% / 108-Key · Dual Perspective</div>
-              <h3 class="card-headline" data-i18n-html="feat.kbHeadline">65% 紧凑或 108 键全尺寸<br />正反双视角，随手切换</h3>
-              <p class="card-body" data-i18n-html="feat.kbBody">
-                无论你习惯极简 65% 小键盘，还是财务/工程必备的 108 键完整小键盘，右键一秒切换并自动锚定右下角平滑调整窗口宽度。
-                支持<strong>「面向猫咪（180° 真实视角）」</strong>与<strong>「面向观众（正向字母易读视角）」</strong>双透视重投影，鼠标左右键也同步自动翻转。
-              </p>
-              <div class="specs-row">
-                <div>
-                  <div class="spec-val" data-i18n="feat.kbSpec1Val">108 键</div>
-                  <div class="spec-lbl" data-i18n="feat.kbSpec1Lbl">完整 F 区与数字小键盘</div>
-                </div>
-                <div>
-                  <div class="spec-val" data-i18n="feat.kbSpec2Val">双视角</div>
-                  <div class="spec-lbl" data-i18n="feat.kbSpec2Lbl">面向猫咪 / 面向观众</div>
-                </div>
-                <div>
-                  <div class="spec-val" data-i18n="feat.kbSpec3Val">真键值</div>
-                  <div class="spec-lbl" data-i18n="feat.kbSpec3Lbl">独立区分主回车与 Num↵</div>
-                </div>
-              </div>
-              <div class="card-cta-row">
-                <button class="btn-outline" id="try-108-btn" type="button" data-i18n="feat.kbTryBtn">在上方画布试玩 108 键 ↑</button>
-              </div>
-            </div>
-            <div class="media-frame">
-              <img src="/kurocat/assets/showcase-108key.webp" alt="KuroCat 65% 与 108 键全尺寸及双视角对比展示" loading="lazy" />
             </div>
           </div>
         </article>
@@ -641,8 +583,8 @@
                 <span data-i18n="mcp.p2Text">📸 “按这张我家猫的照片，给我定制一只专属桌宠！”</span>
                 <em data-i18n="mcp.copyShort">复制</em>
               </button>
-              <button class="prompt-chip" type="button" data-i18n-prompt="mcp.p3" data-prompt="把 KuroCat 缩放到 85%，切换为 108 键全尺寸键盘和面向观众视角">
-                <span data-i18n="mcp.p3Text">⚙️ “把桌宠缩放到 85%，切到 108 键面向观众”</span>
+              <button class="prompt-chip" type="button" data-i18n-prompt="mcp.p3" data-prompt="把 KuroCat 缩放到 85%，切换为面向观众视角">
+                <span data-i18n="mcp.p3Text">⚙️ “把桌宠缩放到 85%，切到面向观众”</span>
                 <em data-i18n="mcp.copyShort">复制</em>
               </button>
             </div>

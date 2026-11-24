@@ -181,7 +181,7 @@ export const KUROCAT_I18N: Record<Locale, KuroCatI18nBundle> = {
       'bento.4Body': '无 Electron 臃肿内核，单文件约 24 MB 内存常驻，原生全局键鼠监听几乎零 CPU 占用。',
       'mcp.p1Text': '💬 “帮我用 KuroCat MCP 捏一只英短蓝猫并切过去”',
       'mcp.p2Text': '📸 “按这张我家猫的照片，给我定制一只专属桌宠！”',
-      'mcp.p3Text': '⚙️ “把桌宠缩放到 85%，切到 108 键面向观众”',
+      'mcp.p3Text': '⚙️ “把桌宠缩放到 85%，切到面向观众”',
       'mcp.copyShort': '复制',
       'mcp.tabHttp': '本机 HTTP',
       'mcp.footerMeta': '支持 7 个内置工具 · 0.4s 热重载',
@@ -193,13 +193,13 @@ export const KUROCAT_I18N: Record<Locale, KuroCatI18nBundle> = {
     html: {
       'hero.title': 'KuroCat · 敲键盘的小黑猫<br /><span>住进你的桌面</span>',
       'hero.sub':
-        '基于 <strong>Tauri v2 + Rust 原生钩子 + Three.js 3D / Canvas 2D 双引擎</strong> 打造的透明置顶桌面键鼠伴侣。默认 <strong>✨ 3D 体积光影手办模式</strong>（右键一键切换 <strong>2D 经典手绘</strong>），安装包仅 <strong>2.15 MB</strong>；内置 <strong>6 款猫咪 + 🐳 大肥鱼（鲸鱼娘）</strong>、<strong>游戏自动戴电竞耳机</strong>、<strong>3D 项圈铃铛</strong>、<strong>自定义尾巴拍键</strong>、<strong>OBS 免抠像直播源</strong>、<strong>输密码自动闭眼防偷窥</strong> 与 <strong>MCP 协议 AI 捏猫</strong>（3D/2D 同步斑点）。',
+        '基于 Tauri 和 Canvas 2D 的桌面键鼠伴侣，可选择 UU 和咪咪。',
       'dl.sub':
-        '所有安装包均内置 <strong>20%–150% 无级缩放</strong>、<strong>65% / 108 键随时切换</strong>、<strong>自定义尾巴拍键</strong> 与 <strong>App 内自动更新</strong>。<br />默认提供 <code>qianyi.one</code> 国内高速直链，同时保留 GitHub Releases 官方原链与 SHA-256 校验。',
+        '所有安装包均内置 <strong>20%–150% 无级缩放</strong>、<strong>65% 紧凑键盘</strong>、<strong>自定义尾巴拍键</strong> 与 <strong>App 内自动更新</strong>。<br />默认提供 <code>qianyi.one</code> 国内高速直链，同时保留 GitHub Releases 官方原链与 SHA-256 校验。',
       'dl.winDesc':
-        '开箱即 65% 紧凑机械键盘，自动创建桌面 <code>KuroCat</code> 图标、开始菜单与系统卸载入口；右键随时可一键切换 <strong>108 键全尺寸小键盘</strong>、<strong>自定义尾巴按键</strong> 与内置自更新。',
+        '开箱即 65% 紧凑机械键盘，自动创建桌面 <code>KuroCat</code> 图标、开始菜单与系统卸载入口；右键随时可一键切换 <strong>键盘方向</strong>、<strong>自定义尾巴按键</strong> 与内置自更新。',
       'dl.macDesc':
-        '原生编译 ARM64 + x86_64 通用镜像，兼容 M1/M2/M3/M4 与老款 Intel Mac（macOS 10.15 Catalina 及以上），内置 65% / 108 键、6 款猫咪与大肥鱼皮肤。打开 <code>.dmg</code> 拖入「应用程序」即可运行。',
+        '原生编译 ARM64 + x86_64 通用镜像，兼容 M1/M2/M3/M4 与老款 Intel Mac（macOS 10.15 Catalina 及以上），内置 65% 紧凑键盘、6 款猫咪与大肥鱼皮肤。打开 <code>.dmg</code> 拖入「应用程序」即可运行。',
       'dl.tipWinBody':
         '由于本项目为免费开源软件、未购买商业 EV 代码签名证书，Edge 浏览器在下载新版本 <code>.exe</code> 时可能会弹出「通常不会下载」提示（全部源码已在 GitHub 公开，可放心使用）：<br /><strong>① Edge 浏览器保留步骤</strong>：鼠标移到下载记录上 → 点右侧<strong>三个点 <code>···</code></strong> → 点<strong>「保留」</strong> → 弹窗显示「删除」按钮时，点击旁边的<strong>下箭头 <code>▾</code>（显示更多）</strong> → 选择<strong>「仍然保留」</strong>即可下载完成（Chrome 请按 <code>Ctrl + J</code> 打开下载页 → 点「保留危险文件」→「仍然保留」）。<br /><strong>② 双击安装若弹出蓝框「Windows 已保护你的电脑」</strong>：点击<strong>「更多信息」</strong> → 点击<strong>「仍要运行」</strong>即可完成安装。',
       'dl.tipMacBody':
@@ -248,7 +248,7 @@ export const KUROCAT_I18N: Record<Locale, KuroCatI18nBundle> = {
     prompts: {
       'mcp.p1': '帮我用 KuroCat MCP 新增一只英短蓝猫，琥珀色大眼睛、浅灰蓝键盘高亮，并立刻切过去',
       'mcp.p2': '看这张我家猫的照片，用 KuroCat MCP 按它的花色、耳尖和斑块位置给我定制一只专属桌宠！',
-      'mcp.p3': '把 KuroCat 缩放到 85%，切换为 108 键全尺寸键盘和面向观众视角',
+      'mcp.p3': '把 KuroCat 缩放到 85%，切换为面向观众视角',
     },
     skins: {
       black: '小黑猫',
@@ -311,7 +311,7 @@ export const KUROCAT_I18N: Record<Locale, KuroCatI18nBundle> = {
     htmlLang: 'en',
     docTitle: 'KuroCat — Free Open-Source Desktop Typing Cat Pet (Bongo Cat Alternative for Win/Mac/Linux/OBS)',
     metaDesc:
-      'KuroCat is a free open-source, lightweight transparent always-on-top desktop typing & mouse cat companion (Bongo Cat alternative) for Windows, macOS, Linux & Android: 6 hand-crafted cats + BigFish whale-girl, password privacy guard, customizable tail keys, native OBS transparent source, 65%/108-key layouts & built-in MCP AI skin studio.',
+      'KuroCat is a free open-source, lightweight transparent always-on-top desktop typing & mouse cat companion (Bongo Cat alternative) for Windows, macOS, Linux & Android: 6 hand-crafted cats + BigFish whale-girl, password privacy guard, customizable tail keys, native OBS transparent source, a compact 65% layout & built-in MCP AI skin studio.',
     text: {
       'nav.back': '← Qianyi',
       'nav.playground': 'Playground',
@@ -408,7 +408,7 @@ export const KUROCAT_I18N: Record<Locale, KuroCatI18nBundle> = {
       'bento.4Body': 'No bloated Electron bundle. ~24 MB RAM footprint and near-zero idle CPU with native global input hooks.',
       'mcp.p1Text': '💬 "Create a British Shorthair blue cat via KuroCat MCP and switch to it"',
       'mcp.p2Text': '📸 "Look at this photo of my cat and design a matching KuroCat skin!"',
-      'mcp.p3Text': '⚙️ "Scale KuroCat to 85% and switch to 108-key viewer perspective"',
+      'mcp.p3Text': '⚙️ "Scale KuroCat to 85% and switch to viewer perspective"',
       'mcp.copyShort': 'Copy',
       'mcp.tabHttp': 'Local HTTP',
       'mcp.footerMeta': '7 Built-in Tools · 0.4s Live Hot-Reload',
@@ -420,13 +420,13 @@ export const KUROCAT_I18N: Record<Locale, KuroCatI18nBundle> = {
     html: {
       'hero.title': 'KuroCat — A Typing Black Cat<br /><span>Living on Your Desktop</span>',
       'hero.sub':
-        'Built with <strong>Tauri v2 + native Rust hooks + Three.js 3D / Canvas 2D dual engine</strong> as a transparent, always-on-top desk companion. Defaults to <strong>✨ 3D Volumetric Figurine</strong> (one-click switch to <strong>2D Classic</strong>), only <strong>2.15 MB</strong> installer; includes <strong>6 cats + 🐳 BigFish</strong>, <strong>optional auto-game gaming headphones</strong>, <strong>3D collar bells</strong>, <strong>customizable tail-key patting</strong>, <strong>native OBS transparent source</strong>, <strong>password privacy guard</strong>, and <strong>MCP AI cat studio</strong> (1:1 spots in 3D &amp; 2D).',
+        'A Tauri desktop companion drawn in Canvas 2D. Choose UU or Mimi.',
       'dl.sub':
-        'Every build includes <strong>20%–150% smooth scaling</strong>, <strong>65% / 108-key switching</strong>, <strong>customizable tail keys</strong>, and <strong>in-app auto-updates</strong>.<br />Fast CDN mirrors on <code>qianyi.one</code> alongside official GitHub Releases with SHA-256 verification.',
+        'Every build includes <strong>20%–150% smooth scaling</strong>, <strong>a compact 65% layout</strong>, <strong>customizable tail keys</strong>, and <strong>in-app auto-updates</strong>.<br />Fast CDN mirrors on <code>qianyi.one</code> alongside official GitHub Releases with SHA-256 verification.',
       'dl.winDesc':
-        'Starts with the 65% compact layout and adds Desktop, Start Menu & Uninstaller shortcuts. Right-click anytime for <strong>108-key full-size</strong>, <strong>custom tail keys</strong>, OBS source & one-click updates.',
+        'Starts with the 65% compact layout and adds Desktop, Start Menu & Uninstaller shortcuts. Right-click anytime for <strong>keyboard orientation</strong>, <strong>custom tail keys</strong>, OBS source & one-click updates.',
       'dl.macDesc':
-        'Native ARM64 + x86_64 Universal DMG supporting Apple Silicon M1–M4 and Intel Macs (macOS 10.15 Catalina+). Includes 65%/108-key layouts, all 6 cats & BigFish. Open <code>.dmg</code> and drag to Applications.',
+        'Native ARM64 + x86_64 Universal DMG supporting Apple Silicon M1–M4 and Intel Macs (macOS 10.15 Catalina+). Includes a compact 65% layout, all 6 cats & BigFish. Open <code>.dmg</code> and drag to Applications.',
       'dl.tipWinBody':
         'Because KuroCat is free open-source software without a commercial EV code-signing certificate, Edge/Chrome may show a download warning (100% source code is public on GitHub):<br /><strong>① Edge</strong>: Hover the download → click <strong><code>···</code></strong> → <strong>Keep</strong> → click the down arrow <strong><code>▾</code> (Show more)</strong> → <strong>Keep anyway</strong> (Chrome: press <code>Ctrl + J</code> → Keep dangerous file → Keep anyway).<br /><strong>② Windows SmartScreen</strong>: Click <strong>More info</strong> → <strong>Run anyway</strong>.',
       'dl.tipMacBody':
@@ -475,7 +475,7 @@ export const KUROCAT_I18N: Record<Locale, KuroCatI18nBundle> = {
     prompts: {
       'mcp.p1': 'Use KuroCat MCP to create a British Shorthair blue cat with amber eyes and ice-blue keycaps, and switch to it now',
       'mcp.p2': 'Look at this photo of my cat and design a custom KuroCat desktop pet matching its fur pattern and markings!',
-      'mcp.p3': 'Scale KuroCat to 85% and switch to the 108-key full-size viewer-facing keyboard',
+      'mcp.p3': 'Scale KuroCat to 85% and switch to the viewer-facing keyboard',
     },
     skins: {
       black: 'Black Cat',
@@ -538,7 +538,7 @@ export const KUROCAT_I18N: Record<Locale, KuroCatI18nBundle> = {
     htmlLang: 'ja',
     docTitle: 'KuroCat · 無料オープンソースのデスクトップタイピング黒猫ペット（Win/Mac/Linux/OBS対応）',
     metaDesc:
-      'KuroCat は Windows / macOS / Linux / Android 対応の無料オープンソース透過デスクトップタイピング黒猫ペット（Bongo Cat 代替）。手描き猫 6 種＋クジラ娘、パスワード自動目隠し保護、しっぽキー指定、OBS 透過ソース、65%/108 キー切替、内蔵 MCP AI スキン生成に対応。',
+      'KuroCat は Windows / macOS / Linux / Android 対応の無料オープンソース透過デスクトップタイピング黒猫ペット（Bongo Cat 代替）。手描き猫 6 種＋クジラ娘、パスワード自動目隠し保護、しっぽキー指定、OBS 透過ソース、65% コンパクト配列、内蔵 MCP AI スキン生成に対応。',
     text: {
       'nav.back': '← 謙一',
       'nav.playground': '体験版',
@@ -635,7 +635,7 @@ export const KUROCAT_I18N: Record<Locale, KuroCatI18nBundle> = {
       'bento.4Body': 'Electron 不使用でメモリ常駐約 24 MB。ネイティブフックにより待機時 CPU 負荷はほぼゼロです。',
       'mcp.p1Text': '💬 「KuroCat MCP でブリティッシュショートヘアを作って切り替えて」',
       'mcp.p2Text': '📸 「うちの猫の写真に合わせて専用ペットを作って！」',
-      'mcp.p3Text': '⚙️ 「85% に縮小して 108 キー・視聴者目線に切り替えて」',
+      'mcp.p3Text': '⚙️ 「85% に縮小して 視聴者目線に切り替えて」',
       'mcp.copyShort': 'コピー',
       'mcp.tabHttp': 'ローカル HTTP',
       'mcp.footerMeta': '内蔵 7 ツール対応 · 0.4 秒ホットリロード',
@@ -647,13 +647,13 @@ export const KUROCAT_I18N: Record<Locale, KuroCatI18nBundle> = {
     html: {
       'hero.title': 'KuroCat · キーボードを叩く黒猫が<br /><span>あなたのデスクトップに</span>',
       'hero.sub':
-        '<strong>Tauri v2 + Rust ネイティブフック + Three.js 3D / Canvas 2D デュアルエンジン</strong> で開発した透過・最前面デスクトップ伴侶。初期設定の <strong>✨ 3D 立体フィギュア</strong> と <strong>2D クラシック</strong> をワンクリック切替、インストーラーわずか <strong>2.15 MB</strong>；<strong>猫 6 種 + 🐳 クジラ娘</strong>、<strong>ゲーム自動検出ゲーミングヘッドセット</strong>、<strong>3D 首輪ベル</strong>、<strong>しっぽタイピング</strong>、<strong>OBS 透過ソース</strong>、<strong>パスワード自動保護</strong>、<strong>MCP AI 捏猫</strong> を標準搭載。',
+        'Canvas 2D で描画する Tauri のデスクトップペット。大肥魚、UU、ミミから選べます。',
       'dl.sub':
-        '全パッケージに <strong>20%–150% 無段階ズーム</strong>・<strong>65% / 108 キー切替</strong>・<strong>しっぽキー選択</strong>・<strong>アプリ内自動更新</strong> を内蔵。<br /><code>qianyi.one</code> 高速ミラーと GitHub Releases 公式リンク（SHA-256 検証対応）を用意しています。',
+        '全パッケージに <strong>20%–150% 無段階ズーム</strong>・<strong>65% コンパクト配列</strong>・<strong>しっぽキー選択</strong>・<strong>アプリ内自動更新</strong> を内蔵。<br /><code>qianyi.one</code> 高速ミラーと GitHub Releases 公式リンク（SHA-256 検証対応）を用意しています。',
       'dl.winDesc':
-        '初期配列は 65% コンパクト。デスクトップアイコンやアンインストーラーを自動作成し、右クリックから <strong>108 フルサイズ</strong>・<strong>しっぽキー指定</strong>・OBS 透過ソース・自動更新へいつでも切替できます。',
+        '初期配列は 65% コンパクト。デスクトップアイコンやアンインストーラーを自動作成し、右クリックから <strong>キーボードの向き</strong>・<strong>しっぽキー指定</strong>・OBS 透過ソース・自動更新へいつでも切替できます。',
       'dl.macDesc':
-        'Apple Silicon (M1–M4) と Intel Mac（macOS 10.15 Catalina 以降）両対応の Universal DMG。65%/108 キーと全 7 スキンを内蔵。<code>.dmg</code> を開いて「アプリケーション」へドラッグするだけです。',
+        'Apple Silicon (M1–M4) と Intel Mac（macOS 10.15 Catalina 以降）両対応の Universal DMG。65% コンパクト配列と全 7 スキンを内蔵。<code>.dmg</code> を開いて「アプリケーション」へドラッグするだけです。',
       'dl.tipWinBody':
         '無料オープンソースで商用コード署名がないため、ダウンロード時に警告が表示される場合があります（全ソースコードは GitHub で公開済み）：<br /><strong>① Edge</strong>：履歴にカーソルを合わせ <strong><code>···</code></strong> → <strong>保存</strong> → <strong><code>▾</code>（詳細表示）</strong> → <strong>保持する</strong>（Chrome は <code>Ctrl + J</code> → 危険なファイルを保存 → 保持）。<br /><strong>② SmartScreen の青い画面</strong>：<strong>詳細情報</strong> → <strong>実行</strong> をクリックしてください。',
       'dl.tipMacBody':
@@ -702,7 +702,7 @@ export const KUROCAT_I18N: Record<Locale, KuroCatI18nBundle> = {
     prompts: {
       'mcp.p1': 'KuroCat MCP を使って、琥珀色の瞳とアイスブルーのキーハイライトを持つブリティッシュショートヘアを作ってすぐ切り替えて',
       'mcp.p2': 'このうちの猫の写真を見て、KuroCat MCP で毛色と模様を再現した専用デスクトップペットを作って！',
-      'mcp.p3': 'KuroCat を 85% に縮小して、108 キー・視聴者目線に切り替えて',
+      'mcp.p3': 'KuroCat を 85% に縮小して、視聴者目線に切り替えて',
     },
     skins: {
       black: '黒猫',

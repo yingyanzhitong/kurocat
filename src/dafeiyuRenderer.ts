@@ -362,10 +362,10 @@ export class DaFeiYuRenderer {
       this.bodyTiltTarget = shySway;
       this.bodyDiveY *= Math.exp(-9 * dt);
     } else if (mouseMode) {
-      const baseShift = layout.is108 ? -125 : -38;
+      const baseShift = Math.max(-140, Math.min(100, (layout.mouseBtnX - charX) * 0.5));
       this.bodyShiftTarget = baseShift + (layout.mouseNX - 0.5) * 12;
       this.bodyTiltTarget = -0.10;
-      this.bodyDiveY += (8 - this.bodyDiveY) * (1 - Math.exp(-10 * dt));
+      this.bodyDiveY += (16 - this.bodyDiveY) * (1 - Math.exp(-10 * dt));
     } else if (!isTyping) {
       this.bodyShiftTarget = 0;
       this.bodyTiltTarget = 0;
@@ -748,7 +748,7 @@ export class DaFeiYuRenderer {
   }
 
   /** Layer 1 (drawn BEFORE keyboard & mouse): waist-anchored whale tail + BigFish sprite + Live2D eyes + soft blush. */
-  public renderBody(ctx: CanvasRenderingContext2D, now: number, layout: DaFeiYuLayout): void {
+  public renderBody(ctx: CanvasRenderingContext2D, now: number, layout: DaFeiYuLayout, headset?: (ctx: CanvasRenderingContext2D) => void): void {
     const g = this.computeGeom(now, layout);
     const isHappy = !layout.privacyMode && layout.petEnergy > 0.25;
     const isBlinking = now < this.blinkUntil;
@@ -793,6 +793,14 @@ export class DaFeiYuRenderer {
         ctx.translate(-g.drawW * 0.5, -g.drawH + g.pivotOff);
         ctx.scale(g.drawW / 224, g.drawH / 278);
         this.renderLiveEyes(ctx, this.eyeGazeX, this.eyeGazeY, this.sprites.idle);
+        ctx.restore();
+      }
+
+      if (headset) {
+        ctx.save();
+        ctx.translate(0, g.pivotOff - 0.54 * g.drawH);
+        ctx.scale(g.drawW / 200, g.drawW / 200);
+        headset(ctx);
         ctx.restore();
       }
 

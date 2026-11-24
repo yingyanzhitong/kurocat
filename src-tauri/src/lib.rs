@@ -293,6 +293,14 @@ fn get_cats() -> Vec<CatSkinConfig> {
 }
 
 #[tauri::command]
+fn import_cat_skin(app: AppHandle, json: String) -> Result<CatSkinConfig, String> {
+    let cat = cats::import_custom_cat(&json)?;
+    let _ = app.emit("kuro-cats", all_cats());
+    apply_breed_and_save(&app, &cat.id);
+    Ok(cat)
+}
+
+#[tauri::command]
 fn get_game_active() -> bool {
     game_detect::is_game_active()
 }
@@ -337,8 +345,6 @@ fn update_settings(app: AppHandle, state: State<'_, AppState>, mut patch: AppSet
     patch.keyboard_orientation = normalize_keyboard_orientation(&patch.keyboard_orientation);
     patch.tail_key_mode = normalize_tail_key_mode(&patch.tail_key_mode);
     patch.tail_key_ids = normalize_tail_key_ids(&patch.tail_key_ids);
-    patch.render_mode = config::normalize_render_mode(&patch.render_mode);
-    patch.collar_color = config::normalize_collar_color(&patch.collar_color);
     patch.headphone_mode = config::normalize_headphone_mode(&patch.headphone_mode);
 
     let (prev_autostart, prev_scale, prev_layout, prev_obs_hide) = {
@@ -860,8 +866,8 @@ async fn install_update(app: AppHandle, info: updater::UpdateInfo) -> Result<(),
 }
 
 #[tauri::command]
-fn open_release_page(url: String) {
-    updater::open_url_in_browser(&url);
+fn open_release_page(url: Option<String>) {
+    updater::open_url_in_browser(url.as_deref().unwrap_or(updater::REPO_RELEASES_PAGE));
 }
 
 #[tauri::command]
@@ -1046,26 +1052,6 @@ pub fn apply_scale_and_save(app: &AppHandle, scale: f64) {
     let updated = {
         let mut s = state.settings.lock().unwrap();
         s.scale = clamped;
-        if let Some((nx, ny)) = new_pos {
-            s.x = Some(nx);
-            s.y = Some(ny);
-        }
-        save_settings(&s);
-        s.clone()
-    };
-    let _ = app.emit("kuro-settings", updated);
-}
-
-pub fn apply_keyboard_layout_and_save(app: &AppHandle, layout: &str) {
-    let normalized = normalize_keyboard_layout(layout);
-    let state = app.state::<AppState>();
-    let cur_scale = { state.settings.lock().unwrap().scale };
-    let new_pos = app
-        .get_webview_window("main")
-        .and_then(|win| resize_window_anchored_bottom_right(&win, &normalized, cur_scale));
-    let updated = {
-        let mut s = state.settings.lock().unwrap();
-        s.keyboard_layout = normalized;
         if let Some((nx, ny)) = new_pos {
             s.x = Some(nx);
             s.y = Some(ny);
@@ -2390,6 +2376,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_settings,
             get_cats,
+            import_cat_skin,
             get_game_active,
             get_mcp_config,
             get_obs_url,

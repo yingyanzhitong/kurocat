@@ -143,16 +143,14 @@ fn tool_definitions() -> Value {
         },
         {
             "name": "update_settings",
-            "description": "Update KuroCat desktop pet settings live (scale 0.2-1.5, showKeyBubbles, soundEnabled, alwaysOnTop, clickThroughLocked, catBreed, keyboardLayout 65|108, keyboardOrientation cat|viewer, tailKeyMode smart|custom|edge|off, tailKeyIds string[], autostart).",
+            "description": "Update KuroCat desktop pet settings live (scale 0.2-1.5, showKeyBubbles, soundEnabled, alwaysOnTop, clickThroughLocked, catBreed, keyboardLayout 65, keyboardOrientation cat|viewer, tailKeyMode smart|custom|edge|off, tailKeyIds string[], autostart).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "catBreed": { "type": "string" },
-                    "renderMode": { "type": "string", "enum": ["2d", "3d"], "description": "Visual engine mode: '2d' (classic 2D Canvas) or '3d' (Three.js 3D volumetric lighting)." },
-                    "collarColor": { "type": "string", "enum": ["none", "red", "blue", "pink", "green"], "description": "Optional 3D collar & gold bell color in 3D mode." },
                     "headphoneMode": { "type": "string", "enum": ["auto", "on", "off"], "description": "Gaming headset mode: 'auto' (automatically wears headphones when a PC game is active), 'on' (always on), or 'off'." },
                     "scale": { "type": "number", "minimum": 0.2, "maximum": 1.5 },
-                    "keyboardLayout": { "type": "string", "enum": ["65", "108"] },
+                    "keyboardLayout": { "type": "string", "enum": ["65"] },
                     "keyboardOrientation": { "type": "string", "enum": ["cat", "viewer"] },
                     "tailKeyMode": { "type": "string", "enum": ["smart", "custom", "edge", "off"] },
                     "tailKeyIds": {
@@ -287,12 +285,6 @@ fn execute_tool(name: &str, args: &Value, on_change: &dyn Fn()) -> Value {
             }
             if let Some(scale) = args.get("scale").and_then(|v| v.as_f64()) {
                 s.scale = scale.clamp(0.20, 1.50);
-            }
-            if let Some(rm) = args.get("renderMode").and_then(|v| v.as_str()) {
-                s.render_mode = crate::config::normalize_render_mode(rm);
-            }
-            if let Some(cc) = args.get("collarColor").and_then(|v| v.as_str()) {
-                s.collar_color = crate::config::normalize_collar_color(cc);
             }
             if let Some(hm) = args.get("headphoneMode").and_then(|v| v.as_str()) {
                 s.headphone_mode = crate::config::normalize_headphone_mode(hm);

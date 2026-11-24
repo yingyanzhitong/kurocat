@@ -1,6 +1,6 @@
 use crate::config::AppSettings;
 use crate::{
-    apply_breed_and_save, apply_keyboard_layout_and_save, apply_keyboard_orientation_and_save,
+    apply_breed_and_save, apply_keyboard_orientation_and_save,
     apply_scale_and_save, apply_tail_key_mode_and_save, is_pet_visible, reset_window_position,
     set_pet_always_on_top, set_pet_visible, shutdown_pet_windows, AppState,
 };
@@ -24,7 +24,7 @@ pub fn setup_tray(app: &AppHandle, initial: &AppSettings) -> tauri::Result<()> {
     let display_menu = crate::windows_display::create_menu(app)?;
     #[cfg(target_os = "macos")]
     let display_menu = crate::macos_window::create_display_menu(app)?;
-    let toggle_show = MenuItem::with_id(app, "toggle_show", "显示 / 隐藏小黑猫", true, None::<&str>)?;
+    let toggle_show = MenuItem::with_id(app, "toggle_show", "显示 / 隐藏桌宠", true, None::<&str>)?;
     let pause_guard = CheckMenuItem::with_id(
         app,
         "pause_guard",
@@ -131,51 +131,39 @@ pub fn setup_tray(app: &AppHandle, initial: &AppSettings) -> tauri::Result<()> {
         &[&obs_toggle, &obs_hide_pet, &obs_open_browser],
     )?;
 
-    let breed_black = MenuItem::with_id(app, "breed_black", "经典小黑猫", true, None::<&str>)?;
-    let breed_ragdoll = MenuItem::with_id(app, "breed_ragdoll", "暖奶茶布偶猫", true, None::<&str>)?;
-    let breed_orange = MenuItem::with_id(app, "breed_orange", "大橘猫（虎斑）", true, None::<&str>)?;
-    let breed_calico = MenuItem::with_id(app, "breed_calico", "三花猫", true, None::<&str>)?;
-    let breed_tuxedo = MenuItem::with_id(app, "breed_tuxedo", "奶牛猫", true, None::<&str>)?;
-    let breed_siamese = MenuItem::with_id(app, "breed_siamese", "暹罗猫", true, None::<&str>)?;
-    let breed_dafeiyu = MenuItem::with_id(app, "breed_dafeiyu", "🐳 大肥鱼（鲸鱼娘）", true, None::<&str>)?;
+    let breed_uu = MenuItem::with_id(app, "breed_uu", "UU", true, None::<&str>)?;
+    let breed_mimi = MenuItem::with_id(app, "breed_mimi", "咪咪", true, None::<&str>)?;
     let breed_menu = Submenu::with_items(
         app,
         "角色外观",
         true,
         &[
-            &breed_black,
-            &breed_ragdoll,
-            &breed_orange,
-            &breed_calico,
-            &breed_tuxedo,
-            &breed_siamese,
-            &breed_dafeiyu,
+            &breed_uu,
+            &breed_mimi,
         ],
     )?;
 
     let scale_25 = MenuItem::with_id(app, "scale_25", "25%（迷你）", true, None::<&str>)?;
     let scale_50 = MenuItem::with_id(app, "scale_50", "50%（小巧）", true, None::<&str>)?;
+    let scale_60 = MenuItem::with_id(app, "scale_60", "60%（默认）", true, None::<&str>)?;
     let scale_75 = MenuItem::with_id(app, "scale_75", "75%（适中）", true, None::<&str>)?;
-    let scale_100 = MenuItem::with_id(app, "scale_100", "100%（默认）", true, None::<&str>)?;
+    let scale_100 = MenuItem::with_id(app, "scale_100", "100%", true, None::<&str>)?;
     let scale_125 = MenuItem::with_id(app, "scale_125", "125%（偏大）", true, None::<&str>)?;
     let scale_150 = MenuItem::with_id(app, "scale_150", "150%（大号）", true, None::<&str>)?;
     let scale_menu = Submenu::with_items(
         app,
         "缩放大小",
         true,
-        &[&scale_25, &scale_50, &scale_75, &scale_100, &scale_125, &scale_150],
+        &[&scale_25, &scale_50, &scale_60, &scale_75, &scale_100, &scale_125, &scale_150],
     )?;
 
-    let kb_65 = MenuItem::with_id(app, "kb_65", "65% 紧凑键盘", true, None::<&str>)?;
-    let kb_108 = MenuItem::with_id(app, "kb_108", "108 键全尺寸（含小键盘）", true, None::<&str>)?;
-    let kb_sep = PredefinedMenuItem::separator(app)?;
     let kb_cat = MenuItem::with_id(app, "kb_cat", "面向猫咪（180° 真实视角）", true, None::<&str>)?;
     let kb_viewer = MenuItem::with_id(app, "kb_viewer", "面向观众（正向字母易读）", true, None::<&str>)?;
     let kb_menu = Submenu::with_items(
         app,
-        "键盘配列与方向",
+        "键盘方向",
         true,
-        &[&kb_65, &kb_108, &kb_sep, &kb_cat, &kb_viewer],
+        &[&kb_cat, &kb_viewer],
     )?;
 
     let tail_smart = MenuItem::with_id(app, "tail_smart", "智能第三只手（忙时出尾）", true, None::<&str>)?;
@@ -555,21 +543,15 @@ pub fn setup_tray(app: &AppHandle, initial: &AppSettings) -> tauri::Result<()> {
                     let _ = mcp_toggle.set_checked(enabled);
                     let _ = app.emit("kuro-settings", s.clone());
                 }
-                "breed_black" => apply_breed_and_save(app, "black"),
-                "breed_ragdoll" => apply_breed_and_save(app, "ragdoll"),
-                "breed_orange" => apply_breed_and_save(app, "orange-tabby"),
-                "breed_calico" => apply_breed_and_save(app, "calico"),
-                "breed_tuxedo" => apply_breed_and_save(app, "tuxedo"),
-                "breed_siamese" => apply_breed_and_save(app, "siamese"),
-                "breed_dafeiyu" => apply_breed_and_save(app, "dafeiyu"),
+                "breed_uu" => apply_breed_and_save(app, "photo-uu"),
+                "breed_mimi" => apply_breed_and_save(app, "photo-mimi-white-forelegs"),
                 "scale_25" => apply_scale_and_save(app, 0.25),
                 "scale_50" => apply_scale_and_save(app, 0.5),
+                "scale_60" => apply_scale_and_save(app, 0.6),
                 "scale_75" => apply_scale_and_save(app, 0.75),
                 "scale_100" => apply_scale_and_save(app, 1.0),
                 "scale_125" => apply_scale_and_save(app, 1.25),
                 "scale_150" => apply_scale_and_save(app, 1.5),
-                "kb_65" => apply_keyboard_layout_and_save(app, "65"),
-                "kb_108" => apply_keyboard_layout_and_save(app, "108"),
                 "kb_cat" => apply_keyboard_orientation_and_save(app, "cat"),
                 "kb_viewer" => apply_keyboard_orientation_and_save(app, "viewer"),
                 "tail_smart" => apply_tail_key_mode_and_save(app, "smart"),

@@ -10,6 +10,8 @@ import {
 import { catAudio } from './audio';
 import { resolveCustomSkin, type CatSkinConfig, type ResolvedSkin } from './catSkins';
 import { DaFeiYuRenderer, type DaFeiYuLayout } from './dafeiyuRenderer';
+import { PhotoCatRenderer } from './photoCat';
+import type { CatRigPose } from './catRig';
 
 export const LOGICAL_W = 420;
 export const LOGICAL_H = 440;
@@ -45,6 +47,10 @@ interface Vec2 {
   x: number;
   y: number;
 }
+
+const TAP_MOVE_LIMIT = 8; // Screen pixels.
+const DOUBLE_TAP_MS = 450;
+const TAP_STROKE_MS = 160;
 
 interface SmearFrame {
   sx: number;
@@ -233,6 +239,15 @@ export class KuroCatEngine {
   public customSkin: ResolvedSkin | null = null;
   public keyboardLayout: KeyboardLayoutId = '65';
   public keyboardOrientation: KeyboardOrientation = 'cat';
+  private touchpadEnabled = false;
+  public get useTouchpad(): boolean { return this.touchpadEnabled; }
+  public set useTouchpad(enabled: boolean) {
+    if (this.touchpadEnabled === enabled) return;
+    this.touchpadEnabled = enabled;
+    this.tapDownAt = null;
+    this.firstTapAt = null;
+    this.tapStrokes = [];
+  }
   public tailKeyMode: TailKeyMode = 'smart';
   private tailKeyIdSet = new Set<string>(DEFAULT_TAIL_KEY_IDS);
   private tailPickerActive = false;
@@ -240,6 +255,7 @@ export class KuroCatEngine {
   private tailPickerHoverId: string | null = null;
   private renderScale = 1.0;
   private embedded = false;
+  private readonly photoCat = new PhotoCatRenderer();
   private dafeiyu = new DaFeiYuRenderer();
   private catTail = {
     heldVks: new Set<number>(),
@@ -269,6 +285,12 @@ export class KuroCatEngine {
       this.catTailHeldAt.clear();
       this.catTail.active = false;
       this.bubbles.length = 0;
+      this.mouseBadges.length = 0;
+      this.clearSleepParticles();
+      for (const paw of [this.leftPaw, this.rightPaw]) {
+        if (paw.mode === 'poke') paw.mode = 'idle';
+        paw.smears.length = 0;
+      }
       for (const anim of this.keyAnims.values()) {
         anim.pressed = false;
         anim.pressAmount = 0;
@@ -542,6 +564,7 @@ export class KuroCatEngine {
 
   private syncLayoutPositions(): void {
     const isBigFish = this.catBreed === 'dafeiyu';
+    const hasRig = this.photoCat.hasRig && !this.photoCat.usesOriginalPaws;
     if (this.keyboardLayout === '108') {
       this.logicalW = 540;
       this.logicalH = 456;
@@ -549,12 +572,12 @@ export class KuroCatEngine {
       this.catTopY = 66;
       this.catBaseY = 292;
       this.kbCenterX = 290;
-      this.kbCenterY = 356;
+      this.kbCenterY = hasRig ? 348 : 356;
       this.kbWidth = 398;
       this.kbHeight = 96;
       this.kbTiltRad = (2.4 * Math.PI) / 180;
-      this.mouseBaseX = isBigFish ? 54 : 46;
-      this.mouseBaseY = isBigFish ? 332 : 342;
+      this.mouseBaseX = hasRig ? 70 : isBigFish ? 54 : 46;
+      this.mouseBaseY = hasRig ? 316 : isBigFish ? 332 : 342;
     } else {
       this.logicalW = 420;
       this.logicalH = 440;
@@ -562,7 +585,7 @@ export class KuroCatEngine {
       this.catTopY = 82;
       this.catBaseY = 308;
       this.kbCenterX = isBigFish ? 234 : 214;
-      this.kbCenterY = 353;
+      this.kbCenterY = hasRig ? 344 : 353;
       this.kbWidth = 266;
       this.kbHeight = 74;
       this.kbTiltRad = (3.4 * Math.PI) / 180;
@@ -580,12 +603,13 @@ export class KuroCatEngine {
       this.catBreed = breedId;
       this.customSkin = null;
     } else if (skin) {
-      this.catBreed = 'black';
+      this.catBreed = skin.pattern === 'lynx-bicolor' && !skin.photo ? 'ragdoll' : 'black';
       this.customSkin = resolveCustomSkin(skin);
     } else {
       this.catBreed = 'black';
       this.customSkin = null;
     }
+    this.photoCat.setPhoto(this.customSkin ? skin?.photo : undefined, skin);
     this.syncLayoutPositions();
     this.wakeRendering();
   }
@@ -599,6 +623,10 @@ export class KuroCatEngine {
       }
       this.wakeRendering();
     }
+  }
+
+  private get ragdollCoat(): ResolvedSkin | null {
+    return this.catBreed === 'ragdoll' ? this.customSkin : null;
   }
 
   public setKeyboardConfig(layout: KeyboardLayoutId, orientation: KeyboardOrientation): void {
@@ -638,8 +666,8 @@ export class KuroCatEngine {
       kbWidth: this.kbWidth,
       kbHeight: this.kbHeight,
       kbTiltRad: this.kbTiltRad,
-      mouseBtnX: mx + localBtnX * c - localBtnY * s,
-      mouseBtnY: my + localBtnX * s + localBtnY * c,
+      mouseBtnX: this.useTouchpad ? this.touchpadX + this.mouseOffsetX : mx + localBtnX * c - localBtnY * s,
+      mouseBtnY: this.useTouchpad ? my - this.tapLift : my + localBtnX * s + localBtnY * c,
       mouseNX: this.lastMouseNX,
       mouseLeft: this.mouseLeftDown,
       mouseRight: this.mouseRightDown,
@@ -687,6 +715,12 @@ export class KuroCatEngine {
   private mouseMiddlePress = 0;
   private lastMouseClickAt = -10000;
   private mouseScrollFlash = 0;
+  private pointerPixels: Vec2 = { x: 0, y: 0 };
+  private tapOrigin: Vec2 = { x: 0, y: 0 };
+  private tapDownAt: number | null = null;
+  private firstTapAt: number | null = null;
+  private tapStrokes: Array<{ start: number; x: number; y: number }> = [];
+  private tapLift = 0;
   private lastMouseMoveAt = -10000;
   private lastMouseNY = 0.5;
   private lastCursorEyeAt = -10000;
@@ -911,8 +945,13 @@ export class KuroCatEngine {
     this.lastPokeAt = now;
   }
 
+  private clearSleepParticles(): void {
+    this.fxParticles = this.fxParticles.filter(particle => particle.kind !== 'z');
+  }
+
   private wakeCat(now = performance.now()): void {
     this.wakeRendering(now);
+    if (this.asleep) this.clearSleepParticles();
     if (this.asleep || this.sleepAmount > 0.35) {
       this.wakeAt = now;
       this.pokeAnnoy(0.28, now);
@@ -1189,8 +1228,9 @@ export class KuroCatEngine {
       this.typingSwayVel += (keyBias * 2.1 + Math.cos(this.typingGroovePhase) * 1.65) * (0.9 + this.typingEnergy * 0.45);
     }
 
-    const prevShoulder = this.getLiveShoulder(chosen, 0);
-    if (chosen.mode === 'poke' && Math.hypot(targetPoint.x - chosen.pos.x, targetPoint.y - chosen.pos.y) > 22) {
+    const continuousPaw = this.photoCat.usesContinuousPawMotion;
+    if (!continuousPaw && chosen.mode === 'poke' && Math.hypot(targetPoint.x - chosen.pos.x, targetPoint.y - chosen.pos.y) > 22) {
+      const prevShoulder = this.getLiveShoulder(chosen, 0);
       chosen.smears.push({
         sx: prevShoulder.x,
         sy: prevShoulder.y,
@@ -1201,7 +1241,7 @@ export class KuroCatEngine {
       if (chosen.smears.length > 3) chosen.smears.shift();
     }
 
-    if (chosen.mode === 'curled' || chosen.mode === 'idle') {
+    if (!continuousPaw && (chosen.mode === 'curled' || chosen.mode === 'idle')) {
       const startPt = this.getLiveCurledPawPos(chosen, 0);
       chosen.pos = { x: startPt.x, y: startPt.y };
       chosen.vel = { x: 0, y: 0 };
@@ -1221,7 +1261,7 @@ export class KuroCatEngine {
     });
 
     const other = chosen.side === 'left' ? this.rightPaw : this.leftPaw;
-    if (other.mode === 'idle' && !activelyMousing) {
+    if (other.mode === 'idle' && !activelyMousing && (!this.photoCat.hasRig || this.photoCat.usesOriginalPaws)) {
       other.mode = 'curled';
       other.lastActiveAt = now;
     }
@@ -1261,7 +1301,18 @@ export class KuroCatEngine {
     }
   }
 
-  public onGlobalMouseMove(nx: number, ny: number): void {
+  private trackTapPosition(x: number, y: number): void {
+    this.pointerPixels.x = x;
+    this.pointerPixels.y = y;
+    if ((this.tapDownAt !== null || this.firstTapAt !== null)
+      && Math.hypot(x - this.tapOrigin.x, y - this.tapOrigin.y) > TAP_MOVE_LIMIT) {
+      this.tapDownAt = null;
+      this.firstTapAt = null;
+    }
+  }
+
+  public onGlobalMouseMove(nx: number, ny: number, x = nx * window.screen.width, y = ny * window.screen.height): void {
+    this.trackTapPosition(x, y);
     const now = performance.now();
     const moveDelta = Math.hypot(nx - this.lastMouseNX, ny - this.lastMouseNY);
 
@@ -1316,12 +1367,12 @@ export class KuroCatEngine {
     return { left: primary, right: rightColor, middle: scroll };
   }
 
-  private spawnMouseBadge(button: 'left' | 'right' | 'middle', now: number): void {
+  private spawnMouseBadge(button: 'left' | 'right' | 'middle', now: number, tapLabel?: string): void {
     if (!this.showKeyBubbles) return;
     const colors = this.getMouseButtonColors();
-    const label = button === 'left' ? 'LMB' : button === 'right' ? 'RMB' : 'MMB';
+    const label = tapLabel ?? (button === 'left' ? 'LMB' : button === 'right' ? 'RMB' : 'MMB');
     const color = button === 'left' ? colors.left : button === 'right' ? colors.right : colors.middle;
-    const mx = this.mouseBaseX + this.mouseOffsetX;
+    const mx = (this.useTouchpad ? this.touchpadX : this.mouseBaseX) + this.mouseOffsetX;
     const my = this.mouseBaseY + this.mouseOffsetY;
     const isCatFacing = this.keyboardOrientation === 'cat';
     const sideShift =
@@ -1349,15 +1400,24 @@ export class KuroCatEngine {
     });
   }
 
-  public onMouseDown(button: string): void {
+  public onMouseDown(button: string, x = this.pointerPixels.x, y = this.pointerPixels.y): void {
     const now = performance.now();
     this.wakeCat(now);
     this.squashSpring.kick(1.2);
+    this.trackTapPosition(x, y);
+    if (button !== 'left') {
+      this.tapDownAt = null;
+      this.firstTapAt = null;
+    }
     if (button === 'left') {
+      if (this.useTouchpad && !this.mouseLeftDown && !this.mouseRightDown && !this.mouseMiddleDown) {
+        this.tapDownAt = now;
+        this.tapOrigin = { x, y };
+      }
       this.mouseLeftDown = true;
       this.mouseDownAt.left = now;
       this.mouseLeftPress = 1;
-      this.spawnMouseBadge('left', now);
+      if (!this.useTouchpad) this.spawnMouseBadge('left', now);
     } else if (button === 'right') {
       this.mouseRightDown = true;
       this.mouseDownAt.right = now;
@@ -1379,23 +1439,39 @@ export class KuroCatEngine {
     this.leftPaw.lastActiveAt = now;
   }
 
-  public onMouseUp(button: string): void {
+  public onMouseUp(button: string, x = this.pointerPixels.x, y = this.pointerPixels.y): void {
     this.wakeRendering();
+    this.trackTapPosition(x, y);
     if (button === 'left') {
+      const now = performance.now();
+      if (this.useTouchpad && this.tapDownAt !== null && now - this.tapDownAt <= 350) {
+        const double = this.firstTapAt !== null && now - this.firstTapAt <= DOUBLE_TAP_MS;
+        // Keep both strokes visible even when both releases arrive in a single render frame.
+        const previous = this.tapStrokes[this.tapStrokes.length - 1];
+        const start = double && previous ? Math.max(now, previous.start + TAP_STROKE_MS) : now;
+        this.tapStrokes = double && previous ? [previous] : [];
+        this.tapStrokes.push({ start, x: this.mouseTargetOffsetX, y: this.mouseTargetOffsetY });
+        this.firstTapAt = double ? null : now;
+        if (double) this.mouseBadges = this.mouseBadges.filter(b => b.label !== '单击');
+        this.spawnMouseBadge('left', now, double ? '双击' : '单击');
+      } else if (this.mouseLeftDown) {
+        this.firstTapAt = null;
+      }
+      this.tapDownAt = null;
       this.mouseLeftDown = false;
-      this.mouseDownAt.left = 0;
-    } else if (button === 'right') {
-      this.mouseRightDown = false;
-      this.mouseDownAt.right = 0;
-    } else if (button === 'middle') {
-      this.mouseMiddleDown = false;
-      this.mouseDownAt.middle = 0;
+    }
+    if (button === 'left' || button === 'right' || button === 'middle') {
+      this.mouseDownAt[button] = 0;
+      if (button === 'right') this.mouseRightDown = false;
+      if (button === 'middle') this.mouseMiddleDown = false;
     }
   }
 
   public onMouseWheel(): void {
     const now = performance.now();
     this.wakeCat(now);
+    this.tapDownAt = null;
+    this.firstTapAt = null;
     this.mouseScrollFlash = 1;
     this.lastMouseMoveAt = now;
     this.lastMouseClickAt = now;
@@ -1439,6 +1515,7 @@ export class KuroCatEngine {
         const dy = py - this.lastPetCursorY;
         const dist = Math.hypot(dx, dy);
         if (dist > 1.5 && dist < 80) {
+          if (this.asleep && !this.privacyMode) this.wakeCat(now);
           this.lastPetMoveAt = now;
           const MIN_STROKE_PX = 14;
           const REQUIRED_STROKES = 2;
@@ -1606,8 +1683,20 @@ export class KuroCatEngine {
 
   // ---- Simulation update ----
 
+  private pointerLean = 0;
+
   private update(dt: number, now: number): void {
+    const reaching = this.photoCat.hasRig && this.leftPaw.mode === 'mouse';
+    this.pointerLean += ((reaching ? 1 : 0) - this.pointerLean) * (1 - Math.exp(-dt * 10));
     this.elapsed += dt;
+    this.tapLift = 0;
+    for (const tap of this.tapStrokes) {
+      const phase = (now - tap.start) / TAP_STROKE_MS;
+      if (phase > 0 && phase < 1) this.tapLift = 11 * Math.sin(Math.PI * phase);
+    }
+    if (this.tapStrokes.length && now - this.tapStrokes[this.tapStrokes.length - 1].start > 480) {
+      this.tapStrokes = [];
+    }
 
     // Cross-platform lost-MouseUp safety fallback (Fixes #4 on macOS/Linux/web; Windows also reconciles via GetAsyncKeyState)
     const MOUSE_STUCK_FALLBACK_MS = 10_000;
@@ -1687,7 +1776,11 @@ export class KuroCatEngine {
     // 1) Alive cat emotional states: sleep (loaf + Zzz), curious (laser-pointer eyes), annoy -> cross (airplane ears + tail desk-thump), idle fidgets!
     const sleepAfterMs = this.embedded ? 18_000 : 28_000;
     const idleMs = now - this.lastInputAt;
-    if (isCatMode && !this.privacyMode && !this.asleep && this.petEnergy < 0.15 && idleMs > sleepAfterMs) {
+    const isUsingPointer = this.mouseLeftDown || this.mouseRightDown || this.mouseMiddleDown;
+    if (
+      isCatMode && !this.privacyMode && !this.asleep &&
+      !isTypingRecently && !isUsingPointer && this.petEnergy < 0.15 && idleMs > sleepAfterMs
+    ) {
       this.asleep = true;
       this.isCross = false;
       this.idleAct = null;
@@ -1949,7 +2042,7 @@ export class KuroCatEngine {
     this.headsetSpring.step(this.headphonesOn ? 1 : 0, dt);
 
     // Floating sleepy comic "Z" particles when asleep
-    if (isCatMode && this.sleepAmount > 0.68 && now >= this.nextZAt) {
+    if (wantSleep && this.sleepAmount >= 0.9 && now >= this.nextZAt) {
       this.nextZAt = now + 1350;
       const headPt = this.spinePoint(0.18, 0);
       this.fxParticles.push({
@@ -2093,7 +2186,9 @@ export class KuroCatEngine {
       const isCatFacing = this.keyboardOrientation === 'cat';
       const lrBias = this.mouseLeftPress - this.mouseRightPress;
       const anyClickPress = Math.max(this.mouseLeftPress, this.mouseRightPress, this.mouseMiddlePress);
-      if (isCatFacing) {
+      if (this.useTouchpad) {
+        paw.target = { x: this.touchpadX + this.mouseOffsetX, y: liveMouseY - this.tapLift };
+      } else if (isCatFacing) {
         // 180° cat-facing: palm heel at TOP, LMB = inner/+X, RMB = outer/-X
         paw.target = {
           x: liveMouseX + 1.2 + lrBias * 6.4,
@@ -2150,20 +2245,31 @@ export class KuroCatEngine {
     paw.idleWeight += (wantIdle - paw.idleWeight) * blendRate;
     paw.curlWeight += (wantCurl - paw.curlWeight) * blendRate;
 
-    // Unconditionally stable, framerate-independent tracking (ZERO Euler spring overshoot at any FPS!)
-    const followRate = paw.mode === 'poke' ? 42 : paw.mode === 'mouse' ? 32 : 22;
-    const follow = 1 - Math.exp(-followRate * dt);
-    paw.pos.x += (paw.target.x - paw.pos.x) * follow;
-    paw.pos.y += (paw.target.y - paw.pos.y) * follow;
-    paw.vel.x = 0;
-    paw.vel.y = 0;
+    if (this.photoCat.usesContinuousPawMotion) {
+      // Keep position and velocity when the target changes. The key target is
+      // already clamped, so the paw can travel to it across the keyboard edge.
+      const rate = paw.mode === 'poke' ? 46 : paw.mode === 'mouse' ? 30 : 24;
+      const decay = Math.exp(-rate * dt);
+      for (const axis of ['x', 'y'] as const) {
+        const distance = paw.pos[axis] - paw.target[axis];
+        const accelerationTerm = paw.vel[axis] + rate * distance;
+        paw.pos[axis] = paw.target[axis] + (distance + accelerationTerm * dt) * decay;
+        paw.vel[axis] = (paw.vel[axis] - rate * accelerationTerm * dt) * decay;
+      }
+    } else {
+      const followRate = paw.mode === 'poke' ? 42 : paw.mode === 'mouse' ? 32 : 22;
+      const follow = 1 - Math.exp(-followRate * dt);
+      paw.pos.x += (paw.target.x - paw.pos.x) * follow;
+      paw.pos.y += (paw.target.y - paw.pos.y) * follow;
+      paw.vel.x = 0;
+      paw.vel.y = 0;
 
-    // Hard guarantee: while poking a key, paw tip stays strictly on top of the keyboard surface
-    if (paw.mode === 'poke') {
-      const clamped = this.clampToKeyboardSurface(paw.pos);
-      if (clamped.y < paw.pos.y || Math.abs(clamped.x - paw.pos.x) > 0.01) {
-        paw.pos.x = clamped.x;
-        paw.pos.y = Math.min(paw.pos.y, clamped.y);
+      if (paw.mode === 'poke') {
+        const clamped = this.clampToKeyboardSurface(paw.pos);
+        if (clamped.y < paw.pos.y || Math.abs(clamped.x - paw.pos.x) > 0.01) {
+          paw.pos.x = clamped.x;
+          paw.pos.y = Math.min(paw.pos.y, clamped.y);
+        }
       }
     }
 
@@ -2195,7 +2301,10 @@ export class KuroCatEngine {
     if (this.catBreed === 'dafeiyu') {
       const now = performance.now();
       const layout = this.buildDaFeiYuLayout();
-      this.dafeiyu.renderBody(ctx, now, layout);
+      this.dafeiyu.renderBody(ctx, now, layout, this.headsetSpring.x > 0.015 ? paint => {
+        this.drawHeadphonesBack(paint);
+        this.drawHeadphonesFront(paint);
+      } : undefined);
       this.drawMiniMouse(ctx);
       this.drawKeyboard(ctx);
       this.dafeiyu.renderForeground(ctx, this.lastDt, now, layout);
@@ -2207,19 +2316,37 @@ export class KuroCatEngine {
       return;
     }
 
-    // Layer 1: Mini mouse & mechanical keyboard (both hop organically on grumpy tail desk-slam!)
+    const photoReady = this.photoCat.ready;
     this.drawMiniMouse(ctx);
     this.drawKeyboard(ctx);
+    if (photoReady) {
+      const blink = this.isBlinking ? 1 - Math.abs(this.blinkProgress - 1) : 0;
+      const slowBlink = this.idleAct?.kind === 'slowBlink'
+        ? 0.92 * Math.sin(Math.PI * Math.min(1, Math.max(0, (performance.now() - this.idleAct.t0) / this.idleAct.dur)))
+        : 0;
+      const sleepClosedness = Math.min(1, this.sleepAmount / 0.9);
+      const closedness = Math.max(blink, slowBlink, this.squintAmount * 0.85, this.privacyClose, sleepClosedness);
+      if (this.photoCat.hasRig) {
+        this.photoCat.drawRig(ctx, this.photoRigPose(breath, purrShift), closedness, this.headphonesOn || this.headsetSpring.x > 0.015
+          ? (paint, front) => front ? this.drawHeadphonesFront(paint) : this.drawHeadphonesBack(paint)
+          : undefined);
+      } else {
+        this.drawPaw(ctx, this.leftPaw, breath, true);
+        this.drawPaw(ctx, this.rightPaw, breath, true);
+        const base = this.spinePoint(1, breath);
+        this.photoCat.draw(
+          ctx, base.x + purrShift, base.y + 5,
+          this.catBaseY - this.catTopY + 13 + breath - this.typingHunch * 7,
+          this.headTilt * 0.22, closedness,
+        );
+      }
+    } else {
+      this.drawTail(ctx);
+      this.drawCatBody(ctx, breath, purrShift);
 
-    // Layer 2: Plush cat tail (above keyboard so near-tail key pats & angry desk-thumps land cleanly, yet tucked behind hip!)
-    this.drawTail(ctx);
-
-    // Layer 3: Exact measured spine-deformable cat silhouette (ears, cheeks, neck, pear belly, grounded hind feet, eyes & tiny whiskers)
-    this.drawCatBody(ctx, breath, purrShift);
-
-    // Layer 4: True-scale velvety cat paws (tapered idle legs / planted diagonal mouse support leg / bent curled chest paw / plump round poking paw!)
-    this.drawPaw(ctx, this.leftPaw, breath);
-    this.drawPaw(ctx, this.rightPaw, breath);
+      this.drawPaw(ctx, this.leftPaw, breath, false);
+      this.drawPaw(ctx, this.rightPaw, breath, false);
+    }
 
     // Layer 4.5: Alive cat comic FX (anger 💢 mark, tail-slam starburst & dust puffs, sleepy Zzz bubbles)
     this.drawCatAliveFx(ctx, performance.now(), breath);
@@ -2231,6 +2358,47 @@ export class KuroCatEngine {
     }
 
     ctx.restore();
+  }
+
+  private photoRigPose(breath: number, purrShift: number): CatRigPose {
+    const hips = this.spinePoint(1, breath);
+    const chest = this.spinePoint(0.61, breath);
+    const head = this.spinePoint(0.24, breath);
+    const foreleg = (paw: PawState, side: -1 | 1) => {
+      const restX = hips.x + side * 24;
+      const restY = hips.y - 3;
+      const originalPaws = this.photoCat.usesOriginalPaws;
+      const mousePress = Math.max(this.mouseLeftPress, this.mouseRightPress, this.mouseMiddlePress);
+      let targetY = paw.pos.y;
+      if (originalPaws && paw.mode === 'poke') {
+        targetY += this.kbBounce * 1.1 + this.deskHopY;
+      } else if (originalPaws && paw.mode === 'mouse') {
+        targetY += mousePress * 1.8 + (this.useTouchpad ? 0 : this.deskHopY * 1.35);
+      }
+      const restBlend = originalPaws ? 0 : paw.idleWeight;
+      return {
+        side,
+        restWeight: paw.idleWeight,
+        curl: paw.curlWeight,
+        squash: paw.impactSquash,
+        shoulder: { x: chest.x + side * 34, y: chest.y - 2 },
+        target: {
+          x: paw.pos.x + (restX - paw.pos.x) * restBlend,
+          y: targetY + (restY - targetY) * restBlend,
+        },
+      };
+    };
+    // Slide the seated body toward the pointing device while the paw stays on its target.
+    const shift = Math.max(-48, Math.min(48, (this.leftPaw.pos.x - hips.x) * 0.36)) * this.pointerLean;
+    const drop = 22 * this.pointerLean;
+    return {
+      hips: { x: hips.x + shift * 0.6, y: hips.y + drop * 0.6 },
+      chest: { x: chest.x + shift, y: chest.y + drop },
+      head: { x: head.x + purrShift + shift, y: head.y + drop },
+      headTilt: this.headTilt * 0.77,
+      tailSwing: (Math.sin(this.elapsed * 2.4) * 0.075 + this.typingSway * 0.07) * (1 - this.sleepAmount * 0.94),
+      forelegs: [foreleg(this.leftPaw, -1), foreleg(this.rightPaw, 1)],
+    };
   }
 
   private onTailDeskSlam(now: number): void {
@@ -3381,7 +3549,63 @@ export class KuroCatEngine {
     }
   }
 
+  private get touchpadX(): number {
+    return Math.min(this.mouseBaseX, this.kbCenterX - this.kbWidth / 2 - 33);
+  }
+
+  private drawTouchpad(ctx: CanvasRenderingContext2D): void {
+    ctx.save();
+    ctx.translate(this.touchpadX, this.mouseBaseY);
+    const surface = ctx.createLinearGradient(0, -19, 0, 19);
+    surface.addColorStop(0, '#fbfaf7');
+    surface.addColorStop(1, '#d6d8d9');
+    ctx.fillStyle = '#7e8388';
+    this.roundRect(ctx, -28, -19, 56, 40, 6);
+    ctx.fill();
+    ctx.fillStyle = surface;
+    this.roundRect(ctx, -27, -18, 54, 36, 5);
+    ctx.fill();
+    ctx.clip();
+    const now = performance.now();
+    for (const tap of this.tapStrokes) {
+      const phase = (now - tap.start - TAP_STROKE_MS) / 320;
+      if (phase < 0 || phase >= 1) continue;
+      ctx.strokeStyle = this.getMouseButtonColors().left;
+      ctx.globalAlpha = 1 - phase;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(tap.x, tap.y, 9 + 14 * phase, 6 + 9 * phase, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    const press = Math.max(this.mouseLeftPress, this.mouseRightPress, this.mouseMiddlePress);
+    const scroll = this.mouseScrollFlash;
+    if (this.leftPaw.mode === 'mouse' || press > 0 || scroll > 0) {
+      const colors = this.getMouseButtonColors();
+      ctx.translate(this.mouseOffsetX, this.mouseOffsetY);
+      ctx.strokeStyle = scroll > 0 || this.mouseMiddlePress > 0 ? colors.middle
+        : this.mouseRightPress > 0 ? colors.right : colors.left;
+      ctx.lineWidth = 1.7 + press;
+      ctx.globalAlpha = 0.65 + press * 0.35;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 8 + press * 2, 5 + press, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      if (scroll > 0) {
+        ctx.globalAlpha = scroll;
+        ctx.beginPath();
+        ctx.ellipse(9, 0, 5, 4, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   private drawMiniMouse(ctx: CanvasRenderingContext2D): void {
+    if (this.useTouchpad) {
+      this.drawTouchpad(ctx);
+      return;
+    }
     const mx = this.mouseBaseX + this.mouseOffsetX;
     const my = this.mouseBaseY + this.mouseOffsetY + this.deskHopY * 1.35;
     const rx = 18.5;
@@ -4009,9 +4233,9 @@ export class KuroCatEngine {
     ctx.restore();
   }
 
-  private drawPaw(ctx: CanvasRenderingContext2D, paw: PawState, breath: number): void {
+  private drawPaw(ctx: CanvasRenderingContext2D, paw: PawState, breath: number, photoBody: boolean): void {
     // 1) Seated idle vertical front legs (EXACT 4 clean lines of ORIG 0.3s!) OR planted diagonal supporting leg (ORIG 2.2s!)
-    if (paw.idleWeight > 0.05) {
+    if (!photoBody && paw.idleWeight > 0.05) {
       ctx.save();
       ctx.globalAlpha = paw.idleWeight;
 

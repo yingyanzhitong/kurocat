@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 fn default_cat_breed() -> String {
-    "black".to_string()
+    "photo-uu".to_string()
 }
 
 fn default_mcp_enabled() -> bool {
@@ -31,30 +31,6 @@ fn default_obs_hide_pet() -> bool {
     false
 }
 
-pub fn default_render_mode() -> String {
-    "3d".to_string()
-}
-
-pub fn normalize_render_mode(raw: &str) -> String {
-    match raw.trim().to_ascii_lowercase().as_str() {
-        "2d" => "2d".to_string(),
-        _ => "3d".to_string(),
-    }
-}
-
-pub fn default_collar_color() -> String {
-    "none".to_string()
-}
-
-pub fn normalize_collar_color(raw: &str) -> String {
-    match raw.trim().to_ascii_lowercase().as_str() {
-        "red" => "red".to_string(),
-        "blue" => "blue".to_string(),
-        "pink" => "pink".to_string(),
-        "green" => "green".to_string(),
-        _ => "none".to_string(),
-    }
-}
 
 pub fn default_headphone_mode() -> String {
     "off".to_string()
@@ -69,19 +45,12 @@ pub fn normalize_headphone_mode(raw: &str) -> String {
 }
 
 pub fn default_keyboard_layout() -> String {
-    if cfg!(feature = "layout-108") {
-        "108".to_string()
-    } else {
-        "65".to_string()
-    }
+    "65".to_string()
 }
 
-pub fn normalize_keyboard_layout(raw: &str) -> String {
-    if raw.trim() == "108" {
-        "108".to_string()
-    } else {
-        "65".to_string()
-    }
+// Accept legacy layout values from settings files and older clients.
+pub fn normalize_keyboard_layout(_: &str) -> String {
+    default_keyboard_layout()
 }
 
 pub fn default_keyboard_orientation() -> String {
@@ -165,6 +134,8 @@ pub struct AppSettings {
     pub keyboard_layout: String,
     #[serde(default = "default_keyboard_orientation")]
     pub keyboard_orientation: String,
+    #[serde(default)]
+    pub use_touchpad: bool,
     #[serde(default = "default_privacy_password_guard")]
     pub privacy_password_guard: bool,
     #[serde(default = "default_tail_key_mode")]
@@ -177,10 +148,6 @@ pub struct AppSettings {
     pub obs_port: u16,
     #[serde(default = "default_obs_hide_pet")]
     pub obs_hide_pet: bool,
-    #[serde(default = "default_render_mode")]
-    pub render_mode: String,
-    #[serde(default = "default_collar_color")]
-    pub collar_color: String,
     #[serde(default = "default_headphone_mode")]
     pub headphone_mode: String,
 }
@@ -194,7 +161,7 @@ impl Default for AppSettings {
             display_id: None,
             #[cfg(windows)]
             windows_display_id: None,
-            scale: 1.0,
+            scale: 0.6,
             always_on_top: true,
             click_through_locked: false,
             show_key_bubbles: true,
@@ -205,14 +172,13 @@ impl Default for AppSettings {
             mcp_port: default_mcp_port(),
             keyboard_layout: default_keyboard_layout(),
             keyboard_orientation: default_keyboard_orientation(),
+            use_touchpad: false,
             privacy_password_guard: default_privacy_password_guard(),
             tail_key_mode: default_tail_key_mode(),
             tail_key_ids: default_tail_key_ids(),
             obs_enabled: default_obs_enabled(),
             obs_port: default_obs_port(),
             obs_hide_pet: default_obs_hide_pet(),
-            render_mode: default_render_mode(),
-            collar_color: default_collar_color(),
             headphone_mode: default_headphone_mode(),
         }
     }
@@ -252,11 +218,13 @@ pub fn load_settings() -> AppSettings {
     let path = config_path();
     if let Ok(content) = fs::read_to_string(&path) {
         if let Ok(mut parsed) = serde_json::from_str::<AppSettings>(&content) {
+            if matches!(parsed.cat_breed.as_str(), "dafeiyu" | "black" | "ragdoll" | "calico" | "orange-tabby" | "tuxedo" | "siamese") {
+                parsed.cat_breed = default_cat_breed();
+            }
+            parsed.keyboard_layout = default_keyboard_layout();
             parsed.scale = parsed.scale.clamp(0.20, 1.50);
             parsed.tail_key_mode = normalize_tail_key_mode(&parsed.tail_key_mode);
             parsed.tail_key_ids = normalize_tail_key_ids(&parsed.tail_key_ids);
-            parsed.render_mode = normalize_render_mode(&parsed.render_mode);
-            parsed.collar_color = normalize_collar_color(&parsed.collar_color);
             parsed.headphone_mode = normalize_headphone_mode(&parsed.headphone_mode);
             return parsed;
         }

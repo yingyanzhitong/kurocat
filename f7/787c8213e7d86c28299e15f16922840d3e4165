@@ -1,0 +1,36 @@
+src-tauri/Cargo.toml
+  s_c82d8b35b3b05b::t_6a2c78264f86a7 3
+src-tauri/tauri.conf.json
+  s_c82d8b35b3b05b::t_6a2c78264f86a7 4
+android/app/build.gradle.kts
+  s_c82d8b35b3b05b::t_6a2c78264f86a7 16-17
+CHANGELOG.md
+  s_c82d8b35b3b05b::t_6a2c78264f86a7 3-6
+website/public/skins/mimi.json
+  s_c82d8b35b3b05b::t_25d599af7d293c 10-12,16-18
+package.json
+  s_c82d8b35b3b05b::t_6a2c78264f86a7 3
+package-lock.json
+  s_c82d8b35b3b05b::t_8817634d5668d2 3,9
+src-tauri/Cargo.lock
+  s_c82d8b35b3b05b::t_f02eb0281abbf9 1793
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f7787c8213e7d86c28299e15f16922840d3e4165",
+  "prompts": {},
+  "logical_commit_id": "f7787c8213e7d86c28299e15f16922840d3e4165",
+  "sessions": {
+    "s_c82d8b35b3b05b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a211d6-819f-7622-a831-93c7005fa915",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "masongzhi <masongzhi@bigo.sg>",
+      "total_additions": 15,
+      "total_deletions": 11
+    }
+  }
+}

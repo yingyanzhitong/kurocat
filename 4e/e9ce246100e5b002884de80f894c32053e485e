@@ -1,0 +1,26 @@
+scripts/sync-gitee-release.mjs
+  s_c82d8b35b3b05b::t_0524786715b379 13,30,33,49-66,114-115,120,127-143,146,148-151,162,165-169,174,189-193,196,200-207
+CHANGELOG.md
+  s_c82d8b35b3b05b::t_ce8ace42c57521 8
+README.md
+  s_c82d8b35b3b05b::t_ce8ace42c57521 178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "4ee9ce246100e5b002884de80f894c32053e485e",
+  "prompts": {},
+  "logical_commit_id": "4ee9ce246100e5b002884de80f894c32053e485e",
+  "sessions": {
+    "s_c82d8b35b3b05b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a211d6-819f-7622-a831-93c7005fa915",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "masongzhi <masongzhi@bigo.sg>",
+      "total_additions": 69,
+      "total_deletions": 37
+    }
+  }
+}

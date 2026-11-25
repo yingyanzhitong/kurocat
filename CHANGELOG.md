@@ -5,6 +5,7 @@
 - GitHub 正式发布后，自动将 Windows、macOS 和 Linux 安装包同步到 Gitee。
 - 桌面端改为从 Gitee 检查正式版本并获取安装包，自动安装前校验 SHA-256。
 - Gitee 同步重试时保留已上传的附件，并为网络传输设置超时。
+- Linux 便携 AppImage 同步超时时，Gitee 仍发布安装包并在发行说明中保留 GitHub 下载入口。
 
 ## v5.0.2 · 2026-11-24
 

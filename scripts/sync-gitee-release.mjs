@@ -10,6 +10,7 @@ const giteeRepo = 'masongzhi1/kurocat';
 const giteeApi = `https://gitee.com/api/v5/repos/${giteeRepo}`;
 const tag = process.env.RELEASE_TAG;
 const token = process.env.GITEE_TOKEN;
+const isPortable = ({ name }) => name.endsWith('.AppImage');
 
 async function gitee(path, { method = 'GET', body, anonymous = false, allowMissing = false } = {}) {
   const headers = { Accept: 'application/json' };
@@ -26,10 +27,10 @@ async function gitee(path, { method = 'GET', body, anonymous = false, allowMissi
   return response.status === 204 ? null : response.json();
 }
 
-function uploadInstaller(path, file) {
+function uploadInstaller(path, file, maxTime) {
   const response = execFileSync('curl', [
     '--http1.1', '--header', 'Expect:', '--silent', '--show-error',
-    '--connect-timeout', '15', '--max-time', '240',
+    '--connect-timeout', '15', '--max-time', maxTime,
     '--speed-limit', '10240', '--speed-time', '20',
     '--config', '-', '--form', `file=@${file}`, '--write-out', '\n%{http_code}',
     giteeApi + path,
@@ -43,6 +44,24 @@ function uploadInstaller(path, file) {
     throw Object.assign(new Error(`Gitee POST ${path}: HTTP ${status}`), { httpStatus: status });
   }
   return JSON.parse(response.slice(0, split));
+}
+
+async function syncInstaller(directory, attachmentsPath, asset) {
+  const { name, size } = asset;
+  const upload = () => uploadInstaller(attachmentsPath, join(directory, name), isPortable(asset) ? '120' : '240');
+  console.log(`正在同步 ${name}`);
+  let uploaded;
+  try {
+    uploaded = upload();
+  } catch (error) {
+    if (isPortable(asset) || (error.httpStatus && error.httpStatus < 500 && ![408, 429].includes(error.httpStatus))) {
+      throw error;
+    }
+    const files = await gitee(`${attachmentsPath}?per_page=100`);
+    uploaded = files.find(file => file.name === name && file.size === size) ?? upload();
+  }
+  if (uploaded.name !== name || uploaded.size !== size) throw new Error(`Gitee 附件校验失败：${name}`);
+  console.log(`已同步 ${name}`);
 }
 
 function syncTag() {
@@ -90,34 +109,46 @@ async function syncRelease(directory) {
   ];
   const missing = required.filter(name => !installers.some(asset => asset.name === name));
   if (missing.length) throw new Error(`GitHub Release 缺少安装包：${missing.join(', ')}`);
-  for (const { name, size } of installers) {
-    if (size <= 0 || size > 100 * 1024 * 1024) throw new Error(`${name} 超出 Gitee 附件大小限制`);
-  }
-
   console.log(`正在下载并校验 GitHub ${tag} 的 ${installers.length} 个安装包`);
   const downloadPrefix = `https://github.com/${process.env.GITHUB_REPOSITORY}/releases/download/${tag}/`;
-  const downloads = await Promise.allSettled(installers.map(async ({ name, url }) => {
+  const downloads = await Promise.allSettled(installers.map(async ({ name, url, size, digest }) => {
+    if (size <= 0 || size > 100 * 1024 * 1024) throw new Error(`${name} 超出 Gitee 附件大小限制`);
     if (url !== downloadPrefix + name) throw new Error(`GitHub 下载地址不匹配：${name}`);
     const response = await fetch(url, { signal: AbortSignal.timeout(180_000) });
     if (!response.ok) throw new Error(`GitHub 下载失败：${name}（HTTP ${response.status}）`);
-    await pipeline(response.body, createWriteStream(join(directory, name)));
-  }));
-  const failedDownload = downloads.find(result => result.status === 'rejected');
-  if (failedDownload) throw failedDownload.reason;
-  const metadata = {};
-  for (const { name, size, digest } of installers) {
     const file = join(directory, name);
+    await pipeline(response.body, createWriteStream(file));
     const hash = createHash('sha256');
     for await (const chunk of createReadStream(file)) hash.update(chunk);
     const sha256 = hash.digest('hex');
     if ((await stat(file)).size !== size || (digest && digest !== `sha256:${sha256}`)) {
       throw new Error(`GitHub 附件校验失败：${name}`);
     }
-    metadata[name] = { sha256, size };
+    return { sha256, size };
+  }));
+  const metadata = {};
+  const available = [];
+  for (const [index, asset] of installers.entries()) {
+    const result = downloads[index];
+    if (result.status === 'fulfilled') {
+      metadata[asset.name] = result.value;
+      available.push(asset);
+    } else if (isPortable(asset)) {
+      console.warn(`::warning::${asset.name} 下载或校验失败，仍可从 GitHub 下载`);
+      if (/^sha256:[0-9a-f]{64}$/.test(asset.digest ?? '')) {
+        metadata[asset.name] = { sha256: asset.digest.slice(7), size: asset.size };
+      }
+    } else {
+      throw result.reason;
+    }
   }
 
+  const requiredInstallers = available.filter(asset => !isPortable(asset));
   const name = source.name || `KuroCat ${tag}`;
-  const notes = source.body?.trim() || name;
+  let notes = source.body?.trim() || name;
+  if (installers.some(isPortable)) {
+    notes += `\n\nLinux AppImage 可从 [GitHub Release](https://github.com/${process.env.GITHUB_REPOSITORY}/releases/tag/${tag}) 下载。`;
+  }
   const body = `${notes}\n\n<!-- KuroCat update assets\n${JSON.stringify(metadata)}\n-->`;
   const final = { tag_name: tag, name, body, prerelease: false };
   const target_commitish = syncTag();
@@ -128,17 +159,19 @@ async function syncRelease(directory) {
   const releasePath = `/releases/${release.id}`;
   const attachmentsPath = `${releasePath}/attach_files`;
   const attachments = await gitee(`${attachmentsPath}?per_page=100`);
-  const hasAllDownloads = release => installers.every(asset => release.assets.some(file =>
+  const hasAllDownloads = (release, packages) => packages.every(asset => release.assets.some(file =>
     file.name === asset.name &&
     file.browser_download_url === `https://gitee.com/${giteeRepo}/releases/download/${tag}/${asset.name}`));
-  if (!release.prerelease && release.name === name && release.body === body &&
-      hasAllDownloads(release) &&
-      installers.every(asset => attachments.some(file => file.name === asset.name && file.size === asset.size))) {
+  const hasAttachments = packages => packages.every(asset =>
+    attachments.some(file => file.name === asset.name && file.size === asset.size));
+  const alreadyPublished = !release.prerelease && release.name === name && release.body === body &&
+    hasAllDownloads(release, requiredInstallers) && hasAttachments(requiredInstallers);
+  if (alreadyPublished && hasAllDownloads(release, available) && hasAttachments(available)) {
     console.log(`Gitee ${tag} 已同步`);
     return;
   }
 
-  if (!release.prerelease) {
+  if (!alreadyPublished && !release.prerelease) {
     await gitee(releasePath, { method: 'PATCH', body: { ...final, body: release.body, prerelease: true } });
   }
   const retained = new Set();
@@ -153,27 +186,25 @@ async function syncRelease(directory) {
   if (release.body !== body) {
     await gitee(releasePath, { method: 'PATCH', body: { ...final, prerelease: true } });
   }
-  for (const { name, size } of installers.sort((a, b) => a.size - b.size)) {
-    if (retained.has(name)) continue;
-    const upload = () => uploadInstaller(attachmentsPath, join(directory, name));
-    console.log(`正在同步 ${name}`);
-    let uploaded;
-    try {
-      uploaded = upload();
-    } catch (error) {
-      if (error.httpStatus && error.httpStatus < 500 && ![408, 429].includes(error.httpStatus)) throw error;
-      const files = await gitee(`${attachmentsPath}?per_page=100`);
-      uploaded = files.find(file => file.name === name && file.size === size) ?? upload();
-    }
-    if (uploaded.name !== name || uploaded.size !== size) throw new Error(`Gitee 附件校验失败：${name}`);
-    console.log(`已同步 ${name}`);
+  for (const asset of requiredInstallers) {
+    if (!retained.has(asset.name)) await syncInstaller(directory, attachmentsPath, asset);
   }
-  await gitee(releasePath, { method: 'PATCH', body: final });
+  if (!alreadyPublished) {
+    await gitee(releasePath, { method: 'PATCH', body: final });
+  }
   const published = await gitee(`/releases/tags/${tag}`, { anonymous: true });
-  if (published.prerelease || published.body !== body || !hasAllDownloads(published)) {
+  if (published.prerelease || published.body !== body || !hasAllDownloads(published, requiredInstallers)) {
     throw new Error(`Gitee ${tag} 未完整公开安装包`);
   }
   console.log(`https://gitee.com/${giteeRepo}/releases/tag/${tag}`);
+  for (const asset of available.filter(isPortable)) {
+    if (retained.has(asset.name)) continue;
+    try {
+      await syncInstaller(directory, attachmentsPath, asset);
+    } catch {
+      console.warn(`::warning::${asset.name} 上传 Gitee 失败，仍可从 GitHub 下载`);
+    }
+  }
 }
 
 if (!/^v\d+\.\d+\.\d+$/.test(tag ?? '')) {

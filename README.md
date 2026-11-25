@@ -173,6 +173,12 @@ npm run tauri:dev      # 本地热更新调试
 npm run tauri:build    # 编译 Release 可执行文件与安装包
 ```
 
+### Gitee 安装包与应用内更新
+
+GitHub Actions 在推送 `vX.Y.Z` 标签时打包并创建 GitHub Release 草稿。正式发布该 Release 后，`Sync Release to Gitee` 会将同一个 Git 标签和安装包同步到 [Gitee 发行版](https://gitee.com/masongzhi1/kurocat/releases)，全部上传后开放给客户端检查。同步也可以在 GitHub Actions 中输入已正式发布的标签手动重跑。
+
+GitHub 仓库需要配置 Actions Secret `GITEE_TOKEN`，对应账号需有 Gitee 仓库的标签与发行版写入权限。Gitee 仓库须公开，桌面客户端通过公开 API 读取正式版本，并使用同步时写入的 SHA-256 校验安装包。旧版本需先更新到包含这项改动的版本，才会切换到 Gitee。
+
 ### macOS 发布签名（升级后保留系统权限）
 
 macOS 按代码签名记住 KuroCat 的「辅助功能」和「输入监控」授权。临时签名（ad hoc）每个版本都不同，用户升级后必须重新授权；每次发版都用同一张代码签名证书签名，授权就能保留。自签名证书即可，不需要 Apple 开发者账号。维护者只需配置一次：

@@ -1,9 +1,12 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter};
 
-const REPO_API_LATEST: &str = "https://api.github.com/repos/yingyanzhitong/kurocat/releases/latest";
-pub const REPO_RELEASES_PAGE: &str = "https://github.com/yingyanzhitong/kurocat/releases";
+const REPO_API_RELEASES: &str =
+    "https://gitee.com/api/v5/repos/masongzhi1/kurocat/releases?direction=desc&per_page=20";
+pub const REPO_RELEASES_PAGE: &str = "https://gitee.com/masongzhi1/kurocat/releases";
+const ASSET_METADATA_MARKER: &str = "<!-- KuroCat update assets";
 
 pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -31,20 +34,24 @@ pub struct UpdateProgressEvent {
 }
 
 #[derive(Debug, Deserialize)]
-struct GhRelease {
+struct GiteeRelease {
     tag_name: String,
-    html_url: Option<String>,
+    prerelease: bool,
     body: Option<String>,
     #[serde(default)]
-    assets: Vec<GhAsset>,
+    assets: Vec<GiteeAsset>,
 }
 
 #[derive(Debug, Deserialize)]
-struct GhAsset {
+struct GiteeAsset {
     name: String,
     browser_download_url: String,
-    size: Option<u64>,
-    digest: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AssetMetadata {
+    sha256: String,
+    size: u64,
 }
 
 pub fn parse_semver(raw: &str) -> (u64, u64, u64) {
@@ -61,9 +68,8 @@ pub fn is_newer_version(latest: &str, current: &str) -> bool {
     parse_semver(latest) > parse_semver(current)
 }
 
-fn extract_sha256(digest: &Option<String>) -> Option<String> {
-    let raw = digest.as_deref()?.trim();
-    let hex = raw.strip_prefix("sha256:").unwrap_or(raw).trim().to_ascii_lowercase();
+fn extract_sha256(digest: &str) -> Option<String> {
+    let hex = digest.trim().to_ascii_lowercase();
     if hex.len() == 64 && hex.chars().all(|c| c.is_ascii_hexdigit()) {
         Some(hex)
     } else {
@@ -104,7 +110,7 @@ fn detect_install_kind() -> &'static str {
     }
 }
 
-fn select_asset<'a>(assets: &'a [GhAsset], install_kind: &str) -> Option<&'a GhAsset> {
+fn select_asset<'a>(assets: &'a [GiteeAsset], install_kind: &str) -> Option<&'a GiteeAsset> {
     let want_108 = cfg!(feature = "layout-108");
     match install_kind {
         "windows-nsis" => assets
@@ -500,13 +506,13 @@ mod winhttp_client {
         };
         if sent == 0 {
             let err = unsafe { GetLastError() };
-            return Err(format!("连接 GitHub 检查更新失败，请检查网络或代理 (错误码 {})", err));
+            return Err(format!("连接 Gitee 失败，请检查网络或代理 (错误码 {})", err));
         }
 
         let received = unsafe { WinHttpReceiveResponse(request.0, null_mut()) };
         if received == 0 {
             let err = unsafe { GetLastError() };
-            return Err(format!("等待 GitHub 响应失败，请检查网络或代理 (错误码 {})", err));
+            return Err(format!("等待 Gitee 响应失败，请检查网络或代理 (错误码 {})", err));
         }
 
         let mut status_code: u32 = 0;
@@ -568,13 +574,13 @@ mod winhttp_client {
 }
 
 #[cfg(windows)]
-fn fetch_latest_release_json() -> Result<String, String> {
+fn fetch_releases_json() -> Result<String, String> {
     let ua = format!("KuroCat/{}", CURRENT_VERSION);
     let mut body = Vec::with_capacity(8192);
-    let response = winhttp_client::get_stream(
-        REPO_API_LATEST,
+    winhttp_client::get_stream(
+        REPO_API_RELEASES,
         &ua,
-        Some("Accept: application/vnd.github+json\r\n"),
+        Some("Accept: application/json\r\n"),
         20_000,
         |chunk| {
             if body.len() + chunk.len() > 2 * 1024 * 1024 {
@@ -583,23 +589,17 @@ fn fetch_latest_release_json() -> Result<String, String> {
             body.extend_from_slice(chunk);
             Ok(())
         },
-    );
-    if let Err(error) = response {
-        if error == "服务器返回 HTTP 404" {
-            return Ok("null".to_string());
-        }
-        return Err(error);
-    }
+    )?;
 
     let text = String::from_utf8_lossy(&body).trim().to_string();
     if text.is_empty() {
-        return Err("GitHub 返回空响应".to_string());
+        return Err("Gitee 返回空响应".to_string());
     }
     Ok(text)
 }
 
 #[cfg(not(windows))]
-fn fetch_latest_release_json() -> Result<String, String> {
+fn fetch_releases_json() -> Result<String, String> {
     use std::process::Command;
 
     let curl_bin = if cfg!(target_os = "macos") {
@@ -619,8 +619,8 @@ fn fetch_latest_release_json() -> Result<String, String> {
             "-H",
             &format!("User-Agent: KuroCat/{}", CURRENT_VERSION),
             "-H",
-            "Accept: application/vnd.github+json",
-            REPO_API_LATEST,
+            "Accept: application/json",
+            REPO_API_RELEASES,
         ])
         .output()
         .map_err(|e| format!("无法调用 curl 检查更新: {}", e))?;
@@ -628,7 +628,7 @@ fn fetch_latest_release_json() -> Result<String, String> {
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         return Err(if stderr.is_empty() {
-            "连接 GitHub 检查更新失败，请检查网络或代理".to_string()
+            "连接 Gitee 检查更新失败，请检查网络或代理".to_string()
         } else {
             format!("检查更新失败: {}", stderr)
         });
@@ -639,22 +639,40 @@ fn fetch_latest_release_json() -> Result<String, String> {
         .rsplit_once('\n')
         .ok_or_else(|| "无法读取更新接口状态码".to_string())?;
     match status {
-        "404" => return Ok("null".to_string()),
         "200" => {}
         _ => return Err(format!("更新接口返回 HTTP {}", status)),
     }
     let text = body.trim().to_string();
     if text.is_empty() {
-        return Err("GitHub 返回空响应".to_string());
+        return Err("Gitee 返回空响应".to_string());
     }
     Ok(text)
 }
 
 pub fn check_latest_update() -> Result<UpdateInfo, String> {
-    let raw_json = fetch_latest_release_json()?;
-    let release: Option<GhRelease> = serde_json::from_str(&raw_json)
+    update_info(&fetch_releases_json()?, detect_install_kind())
+}
+
+fn stable_tag_version(tag: &str) -> Option<(u64, u64, u64)> {
+    let mut parts = tag.strip_prefix('v')?.split('.');
+    let [major, minor, patch] = [parts.next()?, parts.next()?, parts.next()?];
+    if parts.next().is_some() || ![major, minor, patch].iter().all(|part| {
+        !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit())
+    }) {
+        return None;
+    }
+    Some((major.parse().ok()?, minor.parse().ok()?, patch.parse().ok()?))
+}
+
+fn update_info(raw_json: &str, install_kind: &str) -> Result<UpdateInfo, String> {
+    let releases: Vec<GiteeRelease> = serde_json::from_str(raw_json)
         .map_err(|e| format!("解析最新版本信息失败: {}", e))?;
-    let Some(rel) = release else {
+    let latest = releases
+        .into_iter()
+        .filter(|release| !release.prerelease)
+        .filter_map(|release| Some((stable_tag_version(&release.tag_name)?, release)))
+        .max_by_key(|(version, _)| *version);
+    let Some((_, mut rel)) = latest else {
         return Ok(UpdateInfo {
             current_version: CURRENT_VERSION.to_string(),
             latest_version: String::new(),
@@ -664,33 +682,40 @@ pub fn check_latest_update() -> Result<UpdateInfo, String> {
             download_url: None,
             asset_sha256: None,
             asset_size: None,
-            install_kind: detect_install_kind().to_string(),
+            install_kind: install_kind.to_string(),
             notes_summary: String::new(),
         });
     };
 
-    let latest_clean = rel
-        .tag_name
-        .trim()
-        .trim_start_matches(['v', 'V'])
-        .to_string();
-    let has_update = is_newer_version(&latest_clean, CURRENT_VERSION);
-    let install_kind = detect_install_kind();
+    let latest_clean = rel.tag_name[1..].to_string();
+    let raw_body = rel.body.as_deref().unwrap_or_default();
+    let (notes, metadata) = raw_body.rsplit_once(ASSET_METADATA_MARKER).unwrap_or((raw_body, ""));
+    let metadata: HashMap<String, AssetMetadata> = metadata
+        .trim_end()
+        .strip_suffix("-->")
+        .and_then(|json| serde_json::from_str(json.trim()).ok())
+        .unwrap_or_default();
+    let download_prefix = format!("{}/download/{}/", REPO_RELEASES_PAGE, rel.tag_name);
+    rel.assets.retain(|asset| {
+        asset.browser_download_url.strip_prefix(&download_prefix) == Some(asset.name.as_str())
+            && metadata.get(&asset.name).is_some_and(|entry| {
+                entry.size > 0 && extract_sha256(&entry.sha256).is_some()
+            })
+    });
     let asset = select_asset(&rel.assets, install_kind);
+    let asset_metadata = asset.and_then(|asset| metadata.get(&asset.name));
 
     Ok(UpdateInfo {
         current_version: CURRENT_VERSION.to_string(),
+        has_update: is_newer_version(&latest_clean, CURRENT_VERSION),
         latest_version: latest_clean,
-        has_update,
-        release_url: rel
-            .html_url
-            .unwrap_or_else(|| REPO_RELEASES_PAGE.to_string()),
+        release_url: format!("{}/tag/{}", REPO_RELEASES_PAGE, rel.tag_name),
         asset_name: asset.map(|a| a.name.clone()),
         download_url: asset.map(|a| a.browser_download_url.clone()),
-        asset_sha256: asset.and_then(|a| extract_sha256(&a.digest)),
-        asset_size: asset.and_then(|a| a.size),
+        asset_sha256: asset_metadata.and_then(|entry| extract_sha256(&entry.sha256)),
+        asset_size: asset_metadata.map(|entry| entry.size),
         install_kind: install_kind.to_string(),
-        notes_summary: summarize_notes(rel.body.as_deref()),
+        notes_summary: summarize_notes(Some(notes)),
     })
 }
 
@@ -952,7 +977,7 @@ fn install_macos_update(app: &AppHandle, info: &UpdateInfo) -> Result<(), String
         return Err("下载 macOS 更新包失败".to_string());
     }
 
-    // Verify SHA-256 if GitHub Release provided a digest
+    // Verify the SHA-256 from the release metadata before extracting the app.
     if let Some(expected_sha) = info.asset_sha256.as_deref() {
         emit_progress(
             app,
@@ -1122,12 +1147,61 @@ mod tests {
 
     #[test]
     fn sha256_extraction_validates_hex() {
-        let valid = Some("sha256:05c1be2c444f5303770f6d59e216bc0ed7b69321fc44368e4ec231405570f950".to_string());
+        let valid = "05C1BE2C444F5303770F6D59E216BC0ED7B69321FC44368E4EC231405570F950";
         assert_eq!(
-            extract_sha256(&valid).as_deref(),
+            extract_sha256(valid).as_deref(),
             Some("05c1be2c444f5303770f6d59e216bc0ed7b69321fc44368e4ec231405570f950")
         );
-        assert_eq!(extract_sha256(&Some("sha256:short".to_string())), None);
+        assert_eq!(extract_sha256("short"), None);
+    }
+
+    #[test]
+    fn gitee_update_uses_newest_stable_release_and_verified_asset_metadata() {
+        let name = "KuroCat-v90.2.0-macos-universal.app.tar.gz";
+        let sha256 = "a".repeat(64);
+        let download_url = format!("{REPO_RELEASES_PAGE}/download/v90.2.0/{name}");
+        let metadata = serde_json::json!({ (name): { "sha256": sha256, "size": 12345 } });
+        let json = serde_json::json!([
+            { "tag_name": "v90.3.0", "prerelease": true },
+            { "tag_name": "v90.9.0-rc.1", "prerelease": false },
+            { "tag_name": "v90.1.0", "prerelease": false },
+            {
+                "tag_name": "v90.2.0",
+                "prerelease": false,
+                "body": format!("修复问题\n\n{ASSET_METADATA_MARKER}\n{metadata}\n-->"),
+                "assets": [
+                    { "name": name, "browser_download_url": format!("https://example.com/{name}") },
+                    { "name": name, "browser_download_url": download_url },
+                    { "name": "v90.2.0.zip", "browser_download_url": "https://gitee.com/masongzhi1/kurocat/archive/refs/tags/v90.2.0.zip" }
+                ]
+            }
+        ]);
+
+        let info = update_info(&json.to_string(), "macos-app").unwrap();
+        assert!(info.has_update);
+        assert_eq!(info.latest_version, "90.2.0");
+        assert_eq!(info.release_url, format!("{REPO_RELEASES_PAGE}/tag/v90.2.0"));
+        assert_eq!(info.asset_name.as_deref(), Some(name));
+        assert_eq!(info.asset_sha256.as_deref(), Some(sha256.as_str()));
+        assert_eq!(info.asset_size, Some(12345));
+        assert_eq!(info.download_url.as_deref(), Some(download_url.as_str()));
+        assert_eq!(info.notes_summary, "修复问题");
+    }
+
+    #[test]
+    fn gitee_release_without_checksums_offers_the_release_page() {
+        let raw = r#"[{
+            "tag_name": "v90.0.0",
+            "prerelease": false,
+            "assets": [{
+                "name": "KuroCat-90.0.0-x64-setup.exe",
+                "browser_download_url": "https://gitee.com/masongzhi1/kurocat/releases/download/v90.0.0/KuroCat-90.0.0-x64-setup.exe"
+            }]
+        }]"#;
+        let info = update_info(raw, "windows-nsis").unwrap();
+        assert!(info.has_update);
+        assert!(info.download_url.is_none());
+        assert!(!update_info("[]", "windows-nsis").unwrap().has_update);
     }
 
     #[test]
@@ -1153,13 +1227,12 @@ mod tests {
     }
 
     #[test]
-    fn http_url_parser_handles_github_endpoints() {
-        let (https, host, port, path) =
-            parse_http_url("https://api.github.com/repos/yingyanzhitong/kurocat/releases/latest").unwrap();
+    fn http_url_parser_handles_gitee_endpoints() {
+        let (https, host, port, path) = parse_http_url(REPO_API_RELEASES).unwrap();
         assert!(https);
-        assert_eq!(host, "api.github.com");
+        assert_eq!(host, "gitee.com");
         assert_eq!(port, 443);
-        assert_eq!(path, "/repos/yingyanzhitong/kurocat/releases/latest");
+        assert_eq!(path, "/api/v5/repos/masongzhi1/kurocat/releases?direction=desc&per_page=20");
 
         let (https2, host2, port2, path2) =
             parse_http_url("http://127.0.0.1:8080/dl?v=1").unwrap();
@@ -1170,7 +1243,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "requires live internet access to GitHub API"]
+    #[ignore = "requires live internet access to Gitee API"]
     fn live_check_latest_update_uses_native_http() {
         let info = check_latest_update().expect("repository release check should succeed");
         assert!(info.release_url.starts_with(REPO_RELEASES_PAGE));

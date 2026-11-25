@@ -1,0 +1,29 @@
+scripts/sync-gitee-release.mjs
+  s_c82d8b35b3b05b::t_999ecd6fc0c2d8 33,147
+  s_c82d8b35b3b05b::t_e75307d1fff12c 43
+  s_c82d8b35b3b05b::t_b2f10f38c127a5 55
+  s_c82d8b35b3b05b::t_d2e7d4ef1fb815 3,17,29-32,34-42,44-47,158,160-164,166-167
+  s_c82d8b35b3b05b::t_893cd009ea3d29 126,142,144,146,148-149,153-157,159,165
+  s_c82d8b35b3b05b::t_0ae23b24eb17fb 7,51,56-59,64,97-106
+CHANGELOG.md
+  s_c82d8b35b3b05b::t_999ecd6fc0c2d8 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f4b5f0776e89a97805a3fa8bf2c8b787abb31a2b",
+  "prompts": {},
+  "logical_commit_id": "f4b5f0776e89a97805a3fa8bf2c8b787abb31a2b",
+  "sessions": {
+    "s_c82d8b35b3b05b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a211d6-819f-7622-a831-93c7005fa915",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "masongzhi <masongzhi@bigo.sg>",
+      "total_additions": 84,
+      "total_deletions": 35
+    }
+  }
+}
